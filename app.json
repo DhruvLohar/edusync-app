@@ -9,7 +9,18 @@
       "output": "static",
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["expo-router", "expo-web-browser", "expo-font", "expo-secure-store"],
+    "plugins": [
+      "expo-router",
+      "expo-web-browser",
+      "expo-font",
+      "expo-secure-store",
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "We need access to your camera to take photos for attendance verification."
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": true,
       "tsconfigPaths": true
@@ -22,9 +33,15 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "We need access to your camera to take photos for attendance verification."
+      },
+      "bundleIdentifier": "com.example.edusync"
     },
     "android": {
       "adaptiveIcon": {
@@ -32,7 +49,10 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.example.edusync",
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
     }
   }
 }
