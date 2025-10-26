@@ -7,62 +7,46 @@ import {
   ScrollView,
   StyleSheet,
 } from 'react-native';
-import { Camera, useCameraDevices } from 'react-native-vision-camera';
+// Camera disabled for Expo Go: commented out react-native-vision-camera imports
+// import { Camera, useCameraDevices } from 'react-native-vision-camera';
 import { getFaceEmbedding, saveEmbedding } from '~/lib/ImageChecker';// Corrected import path to be relative
 
 export default function DashboardScreen() {
   const [embedding, setEmbedding] = useState<number[] | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  
-  const devices = useCameraDevices();
-  const device = devices.find((d) => d.position === 'front');
-  const camera = useRef<Camera>(null);
+  // We're running inside Expo Go which doesn't support react-native-vision-camera.
+  // Keep the permission state but default to false and show a helpful message.
+  const [hasPermission, setHasPermission] = useState<boolean | null>(false);
 
+  // Camera APIs are disabled in this build. The following lines are intentionally
+  // commented out so the app remains runnable in Expo Go.
+  // const devices = useCameraDevices();
+  // const device = devices.find((d) => d.position === 'front');
+  // const camera = useRef<Camera>(null);
+
+  // Don't request native camera permission in Expo Go. Provide a message instead.
   useEffect(() => {
-    requestPermission();
+    // noop: camera is disabled
   }, []);
 
   const requestPermission = async () => {
-    const permission = await Camera.requestCameraPermission();
-    setHasPermission(permission === 'granted');
+    // In the Expo Go workflow the native vision camera is not available.
+    // Inform the user if they try to enable camera functionality.
+    Alert.alert('Camera disabled', 'Camera features are disabled in Expo Go. Use a bare/standalone build to enable them.');
+    setHasPermission(false);
   };
 
   const captureAndProcess = async () => {
-    if (!camera.current || !hasPermission || isProcessing) return;
-
-    try {
-      setIsProcessing(true);
-      setEmbedding(null);
-      
-      console.log('📸 Taking photo...');
-      const photo = await camera.current.takePhoto();
-      console.log('✅ Photo captured:', photo.path);
-
-      console.log('🤖 Processing with FaceNet...');
-      // Process the saved photo file
-      const { embedding: resultEmbedding } = await getFaceEmbedding(`file://${photo.path}`);
-
-      await saveEmbedding('kamal_jain', resultEmbedding);
-      
-      console.log('✅ Face embedding extracted!');
-      setEmbedding(resultEmbedding);
-      Alert.alert('Success!', `Embedding extracted with ${resultEmbedding.length} dimensions.`);
-
-    } catch (error) {
-      console.error('💥 Failed to capture or process photo:', error);
-      Alert.alert('Error', 'Could not process the image.');
-    } finally {
-      setIsProcessing(false);
-    }
+    // Camera functionality is disabled in Expo Go. Provide a helpful message.
+    Alert.alert('Camera disabled', 'Capture is unavailable in Expo Go. Build a standalone/bare app to use the camera.');
+    return;
   };
 
-  if (hasPermission === null || !device) {
+  // When using Expo Go we don't have a device; show explanatory UI instead.
+  if (hasPermission === null) {
     return (
       <View style={styles.container}>
-        <Text style={styles.message}>
-          {hasPermission === null ? 'Requesting permissions...' : 'No front camera found.'}
-        </Text>
+        <Text style={styles.message}>{'Requesting permissions...'}</Text>
       </View>
     );
   }
@@ -70,9 +54,9 @@ export default function DashboardScreen() {
   if (!hasPermission) {
     return (
       <View style={styles.container}>
-        <Text style={styles.message}>Camera permission is required.</Text>
+        <Text style={styles.message}>Camera features are disabled while running in Expo Go.</Text>
         <TouchableOpacity onPress={requestPermission} style={styles.button}>
-          <Text style={styles.buttonText}>Grant Permission</Text>
+          <Text style={styles.buttonText}>Why?</Text>
         </TouchableOpacity>
       </View>
     );
@@ -84,13 +68,8 @@ export default function DashboardScreen() {
         <Text style={styles.title}>FaceNet Face Recognition</Text>
         
         <View style={styles.cameraWrapper}>
-          <Camera
-            ref={camera}
-            style={styles.camera}
-            device={device}
-            isActive={true}
-            photo={true} // Enable photo mode
-          />
+          {/* Camera component removed for Expo Go. Replace with placeholder. */}
+          <Text style={{ color: '#6B7280' }}>Camera disabled in Expo Go</Text>
         </View>
 
         <TouchableOpacity

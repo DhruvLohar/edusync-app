@@ -10,8 +10,8 @@ export default function ProtectedLayout() {
         <Stack initialRouteName={profile?.onboardingDone ? "(tabs)" : "onboarding"} screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
 
-            <Stack.Screen name="onboarding" options={{ headerShown: true }} />
-            <Stack.Screen name="editprofile" options={{ headerShown: true }} />
+            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+            <Stack.Screen name="editprofile" options={{ headerShown: false }} />
         </Stack>
     )
 }

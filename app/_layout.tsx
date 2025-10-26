@@ -9,7 +9,6 @@ import CustomSplashScreen from '~/components/layout/SplashScreen';
 SplashScreen.preventAutoHideAsync();
 
 export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
   initialRouteName: '(tabs)',
 };
 
@@ -25,7 +24,7 @@ export default function RootLayout() {
     Poppins_700Bold,
   });
 
-  const isLoggedIn = true;// !!(session && profile);
+  const isLoggedIn = false;// !!(session && profile);
 
   async function checkSession() {
     await rehydrateSession();
