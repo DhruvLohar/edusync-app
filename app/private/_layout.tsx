@@ -7,10 +7,8 @@ export default function ProtectedLayout() {
     const { profile } = useAuthStore();
 
     return (
-        <Stack initialRouteName={profile?.onboardingDone ? "(tabs)" : "onboarding"} screenOptions={{ headerShown: false }}>
+        <Stack initialRouteName={"(tabs)"} screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
-
-            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
             <Stack.Screen name="editprofile" options={{ headerShown: false }} />
         </Stack>
     )

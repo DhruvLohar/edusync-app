@@ -7,9 +7,8 @@ import {
   Alert,
   TouchableOpacity,
   ScrollView,
-  StyleSheet,
   Image,
-  Modal, // Added Modal from react-native for better modal behavior
+  Modal,
 } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -36,10 +35,10 @@ interface OTPFormProps {
 const BottomModal = ({ isVisible, onClose, children }: ModalProps) => {
   return (
     <Modal visible={isVisible} animationType="slide" transparent={true} onRequestClose={onClose}>
-      <View style={modalStyles.overlay}>
-        <View style={modalStyles.modalContent}>
-          <TouchableOpacity onPress={onClose} style={modalStyles.closeButton}>
-            <Text style={{ fontSize: 24, fontWeight: 'bold' }}>×</Text>
+      <View className="absolute inset-0 bg-black/50 justify-end items-center">
+        <View className="w-full bg-white rounded-t-3xl pt-2.5 min-h-[300px]">
+          <TouchableOpacity onPress={onClose} className="self-end px-5 pb-2.5">
+            <Text className="text-2xl font-bold">×</Text>
           </TouchableOpacity>
           {children}
         </View>
@@ -52,26 +51,26 @@ const BottomModal = ({ isVisible, onClose, children }: ModalProps) => {
 const OTPForm = ({ onSubmit, loading }: OTPFormProps) => {
   const [otp, setOtp] = useState('');
   return (
-    <View style={{ padding: 20 }}>
-      <Text style={modalStyles.title}>Enter OTP</Text>
-      <Text style={modalStyles.subtitle}>A 6-digit code has been sent to your email.</Text>
+    <View className="p-5">
+      <Text className="text-2xl font-bold text-center mb-2" style={{ fontFamily: 'Poppins_600SemiBold' }}>
+        Enter OTP
+      </Text>
+      <Text className="text-sm text-gray-500 text-center mb-8" style={{ fontFamily: 'Poppins_400Regular' }}>
+        A 6-digit code has been sent to your email.
+      </Text>
       <InputField
         placeholder="0 0 0 0 0 0"
         keyboardType="number-pad"
         value={otp}
         onChangeText={setOtp}
         maxLength={6}
-        containerStyle={[
-          modalStyles.otpContainer,
-          // Note: These styles are now applied to the container, not the input text itself.
-          { height: 60, textAlign: 'center', fontSize: 24, letterSpacing: 10 } as any,
-        ]}
+        containerStyle="h-16 border border-gray-300 rounded-lg mx-5 mb-5 text-center text-2xl tracking-[10px]"
       />
       <Button
         title="Verify OTP"
         loading={loading}
         onPress={() => onSubmit({ otp })}
-        style={modalStyles.verifyButton}
+        className="h-12 bg-[#1E90FF] rounded-lg mx-5 mt-2.5"
       />
     </View>
   );
@@ -115,28 +114,48 @@ export const LoginScreen = () => {
       setLoading(false);
       setModalVisible(false);
       Alert.alert('Success! 🎉', `OTP ${otp} verified.`);
+      // FIXED: Navigate to the tabs root or specific tab
+      // Option 1: Navigate to tabs root (will show the initial route - index)
+      router.replace('/private/(tabs)');
+      
+      // Option 2: Navigate to a specific tab
+      // router.replace('/(tabs)/analytics');
     }, 1500);
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView className="flex-1 bg-white">
       <StatusBar barStyle="dark-content" />
 
       <ScrollView
-        // Style to center content vertically
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={{ 
+          flexGrow: 1, 
+          paddingHorizontal: 24, 
+          paddingTop: 0, 
+          paddingBottom: 20, 
+          justifyContent: 'center' 
+        }}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled">
-        <View style={styles.container}>
-          <Image source={require('../../assets/logo.png')} style={styles.logoImage} />
+        keyboardShouldPersistTaps="handled"
+      >
+        <View className="flex-0 self-stretch">
+          <Image 
+            source={require('../../assets/logo.png')} 
+            className="w-20 h-20 mb-5 -mt-10"
+            resizeMode="contain"
+          />
 
-          <Text style={styles.welcomeBackText}>Welcome Back</Text>
-          <Text style={styles.appNameText}>
-            To <Text style={styles.eduSyncHighlight}>EduSync</Text>
+          <Text className="text-4xl text-black mb-0 font-normal" style={{ fontFamily: 'Poppins_600SemiBold' }}>
+            Welcome Back
           </Text>
-          <Text style={styles.taglineText}>Hello there, Login to continue</Text>
+          <Text className="text-4xl text-black mb-2.5 font-bold" style={{ fontFamily: 'Poppins_600SemiBold' }}>
+            To <Text className="text-[#1E90FF]" style={{ fontFamily: 'Poppins_600SemiBold' }}>EduSync</Text>
+          </Text>
+          <Text className="text-base text-gray-500" style={{ fontFamily: 'Poppins_400Regular' }}>
+            Hello there, Login to continue
+          </Text>
 
-          <View style={styles.inputFieldWrapper}>
+          <View className="mb-4 relative mt-8">
             <Controller
               control={control}
               name="email"
@@ -152,16 +171,17 @@ export const LoginScreen = () => {
                   error={errors.email?.message}
                   keyboardType="email-address"
                   onFocus={() => setIsEmailFocused(true)}
-                  containerStyle={[
-                    styles.inputContainer,
-                    isEmailFocused && styles.inputContainerFocused,
-                    styles.inputStyle as any,
-                  ]}
+                  containerStyle={`border ${
+                    isEmailFocused ? 'border-[#1E90FF]' : 'border-gray-300'
+                  } rounded-lg px-0 bg-white h-12`}
+                  style={{ paddingHorizontal: 15, fontSize: 16, color: '#333' }}
                 />
               )}
             />
-            <TouchableOpacity style={styles.needHelpButton}>
-              <Text style={styles.needHelpText}>Need Help?</Text>
+            <TouchableOpacity className="absolute right-0 -bottom-6 py-1">
+              <Text className="text-[#1E90FF] text-sm font-semibold" style={{ fontFamily: 'Poppins_600SemiBold' }}>
+                Need Help?
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -169,27 +189,35 @@ export const LoginScreen = () => {
             title="Send OTP"
             loading={loading}
             onPress={handleSubmit(onSubmitStatic)}
-            style={styles.otpButton}
+            className="mt-9 h-12 py-2 bg-[#1E90FF] rounded-lg"
           />
 
-          <View style={styles.dividerContainer}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR</Text>
-            <View style={styles.dividerLine} />
+          <View className="flex-row items-center my-8">
+            <View className="flex-1 h-px bg-gray-300" />
+            <Text className="mx-4 text-gray-500 text-sm" style={{ fontFamily: 'Poppins_400Regular' }}>
+              OR
+            </Text>
+            <View className="flex-1 h-px bg-gray-300" />
           </View>
 
           <TouchableOpacity
-            style={styles.googleButton}
-            onPress={() => Alert.alert('Google Login', 'This would initiate Google Sign-in')}>
-            <Text style={styles.googleIconText}>G</Text>
-            <Text style={styles.googleButtonText}>Google</Text>
+            className="flex-row items-center justify-center h-12 bg-white border border-gray-300 rounded-lg mb-5"
+            onPress={() => Alert.alert('Google Login', 'This would initiate Google Sign-in')}
+          >
+            <Text className="text-xl font-bold text-[#4285F4] mr-2.5">G</Text>
+            <Text className="text-lg text-gray-600 font-medium" style={{ fontFamily: 'Poppins_500Medium' }}>
+              Google
+            </Text>
           </TouchableOpacity>
 
-          {/* Register container moved slightly up and cleaned up for centering */}
-          <View style={styles.registerContainer}>
-            <Text style={styles.registerText}>Don't have an account? </Text>
+          <View className="flex-row justify-center items-center py-2.5 mt-2.5">
+            <Text className="text-gray-600 text-base" style={{ fontFamily: 'Poppins_400Regular' }}>
+              Don't have an account?{' '}
+            </Text>
             <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
-              <Text style={styles.registerLink}>Register</Text>
+              <Text className="text-[#1E90FF] text-base ml-1" style={{ fontFamily: 'Poppins_600SemiBold' }}>
+                Register
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -201,117 +229,5 @@ export const LoginScreen = () => {
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 0,
-    paddingBottom: 20,
-    justifyContent: 'center', 
-  },
-  container: {
-    flex: 0,
-    alignSelf: 'stretch',
-  },
-  logoImage: { width: 80, height: 80, resizeMode: 'contain', marginBottom: 20, marginTop: -40 },
-  welcomeBackText: {
-    fontSize: 32,
-    color: '#000',
-    marginBottom: 0,
-    fontWeight: 'normal',
-    fontFamily: 'Poppins_600SemiBold',
-  },
-  appNameText: {
-    fontSize: 32,
-    color: '#000',
-    marginBottom: 10,
-    fontWeight: 'bold',
-    fontFamily: 'Poppins_600SemiBold',
-  },
-  eduSyncHighlight: { color: '#1E90FF', fontFamily: 'Poppins_600SemiBold' },
-  taglineText: { fontSize: 16, color: '#777', fontFamily: 'Poppins_400Regular' },
-  inputFieldWrapper: { marginBottom: 15, position: 'relative' },
-  inputContainer: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 0,
-    backgroundColor: '#fff',
-    height: 50,
-  },
-  inputContainerFocused: { borderColor: '#1E90FF' },
-  inputStyle: { paddingHorizontal: 15, fontSize: 16, color: '#333' } as any,
-  needHelpButton: { position: 'absolute', right: 0, bottom: -25, paddingVertical: 5 },
-  needHelpText: { color: '#1E90FF', fontSize: 14, fontWeight: '600' },
-  otpButton: { marginTop: 35, height: 50, backgroundColor: '#1E90FF', borderRadius: 8 },
-  dividerContainer: { flexDirection: 'row', alignItems: 'center', marginVertical: 30 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: '#ddd' },
-  dividerText: { marginHorizontal: 15, color: '#888', fontSize: 14 },
-  googleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 50,
-    backgroundColor: '#FFF',
-    borderWidth: 1,
-    borderColor: '#DDD',
-    borderRadius: 8,
-    marginBottom: 20, // Reduced bottom margin
-  },
-  googleIconText: { fontSize: 20, fontWeight: 'bold', color: '#4285F4', marginRight: 10 },
-  googleButtonText: { fontSize: 18, color: '#555', fontWeight: '500' },
-  // **FIXED: Positioning for Centering**
-  registerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 10, // Uses simple padding/margin now
-    marginTop: 10,
-  },
-  registerText: { color: '#555', fontSize: 16 , fontFamily: 'Poppins_400Regular' },
-  registerLink: {         color: '#1E90FF',
-        fontSize: 16,
-        fontFamily: 'Poppins_600SemiBold',
-        marginLeft: 5,
-    },
-});
-
-// --- Styles for Modal ---
-const modalStyles = StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end', // Keeps modal pinned to the bottom
-    alignItems: 'center',
-  },
-  modalContent: {
-    width: '100%',
-    backgroundColor: 'white',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 10,
-    minHeight: 300,
-  },
-  closeButton: { alignSelf: 'flex-end', paddingHorizontal: 20, paddingBottom: 10 },
-  title: { fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginBottom: 8 },
-  subtitle: { fontSize: 14, color: '#777', textAlign: 'center', marginBottom: 30 },
-  otpContainer: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    marginHorizontal: 20,
-    marginBottom: 20,
-  },
-  otpInput: { height: 60, textAlign: 'center', fontSize: 24, letterSpacing: 10 },
-  verifyButton: {
-    height: 50,
-    backgroundColor: '#1E90FF',
-    borderRadius: 8,
-    marginHorizontal: 20,
-    marginTop: 10,
-  },
-});
 
 export default LoginScreen;

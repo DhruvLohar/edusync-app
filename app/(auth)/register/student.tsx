@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   SafeAreaView,
   View,
   Text,
   StatusBar,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   Alert,
@@ -12,8 +11,10 @@ import {
   Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import { InputField } from '~/components/ui/Input';
 import { Button } from '~/components/ui/Button';
+import { getFaceEmbedding, saveEmbedding } from '~/lib/ImageChecker';
 
 const DEPARTMENTS = [
   'Computer Science',
@@ -37,14 +38,18 @@ interface SuccessModalProps {
 
 const SuccessRegistrationModal: React.FC<SuccessModalProps> = ({ isVisible, onBackToHome }) => (
   <Modal animationType="fade" transparent={true} visible={isVisible} onRequestClose={onBackToHome}>
-    <View style={studentStyles.modalOverlay}>
-      <View style={studentStyles.modalContent}>
-        <Text style={studentStyles.modalTitle}>Congratulations</Text>
-        <Text style={studentStyles.modalSubtitle}>Your account is ready to use !</Text>
+    <View className="flex-1 justify-center items-center bg-black/50">
+      <View className="w-4/5 bg-white rounded-3xl p-8 items-center shadow-2xl">
+        <Text className="text-2xl font-bold text-[#1E90FF] mb-3" style={{ fontFamily: 'Poppins_600SemiBold' }}>
+          Congratulations
+        </Text>
+        <Text className="text-base text-gray-600 text-center mb-8" style={{ fontFamily: 'Poppins_400Regular' }}>
+          Your account is ready to use !
+        </Text>
         <Button
-          title="Back to Home"
+          title="Back To Home"
           onPress={onBackToHome}
-          style={studentStyles.modalButton as any}
+          className="w-full h-14 bg-[#1E90FF] rounded-xl justify-center items-center"
         />
       </View>
     </View>
@@ -57,10 +62,47 @@ export default function StudentRegistrationScreen() {
   const [loading, setLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+  // Personal Info
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+
+  // Academic Details
+  const [grNumber, setGrNumber] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState<string | null>(null);
 
+  // Face Recognition
+  const [capturedImageUri, setCapturedImageUri] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [embeddingSaved, setEmbeddingSaved] = useState(false);
+  const camera = useRef<Camera>(null);
+  const device = useCameraDevice('front');
+  const { hasPermission, requestPermission } = useCameraPermission();
+
+  useEffect(() => {
+    if (currentStep === 3 && !hasPermission) {
+      requestPermission();
+    }
+  }, [currentStep]);
+
   const handleNext = () => {
+    // Validation for step 1
+    if (currentStep === 1) {
+      if (!fullName.trim() || !email.trim() || !phoneNumber.trim()) {
+        Alert.alert('Error', 'Please fill in all personal information fields');
+        return;
+      }
+    }
+
+    // Validation for step 2
+    if (currentStep === 2) {
+      if (!grNumber.trim() || !selectedDepartment || !selectedAcademicYear) {
+        Alert.alert('Error', 'Please complete all academic details');
+        return;
+      }
+    }
+
     if (currentStep < 3) {
       setCurrentStep(currentStep + 1);
     } else {
@@ -76,7 +118,61 @@ export default function StudentRegistrationScreen() {
     }
   };
 
+  const captureAndProcess = async () => {
+    if (!camera.current) {
+      Alert.alert('Error', 'Camera not ready');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      
+      // Take photo
+      const photo = await camera.current.takePhoto({
+        flash: 'off',
+        enableShutterSound: false,
+      });
+
+      const photoUri = `file://${photo.path}`;
+      setCapturedImageUri(photoUri);
+
+      // Generate face embedding
+      const { embedding } = await getFaceEmbedding(photoUri);
+
+      // Create unique identifier: "FullName - GRNumber"
+      const userId = `${fullName.trim()} - ${grNumber.trim()}`;
+
+      // Save embedding with user identifier
+      await saveEmbedding(userId, embedding);
+
+      setEmbeddingSaved(true);
+      Alert.alert(
+        'Success',
+        `Face registered successfully for ${fullName}!`,
+        [{ text: 'OK' }]
+      );
+
+      console.log(`✅ Face embedding saved for: ${userId}`);
+      console.log(`📊 Embedding dimensions: ${embedding.length}D`);
+
+    } catch (error) {
+      console.error('💥 Error in face capture/processing:', error);
+      Alert.alert(
+        'Error',
+        'Failed to capture or process face. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleFinalRegister = () => {
+    if (!embeddingSaved) {
+      Alert.alert('Error', 'Please capture your face before registering');
+      return;
+    }
+
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
@@ -90,110 +186,137 @@ export default function StudentRegistrationScreen() {
   };
 
   const StepIndicator: React.FC<StepIndicatorProps> = ({ step, title, isActive }) => (
-    <View style={studentStyles.stepItem}>
-      <View
-        style={[
-          studentStyles.checkboxContainer,
-          isActive ? studentStyles.checkboxActive : studentStyles.checkboxInactive,
-        ]}>
-        <Text style={studentStyles.checkboxIcon}>{isActive ? '✓' : ''}</Text>
+    <View className="flex-row items-center">
+      <View className={`w-6 h-6 rounded-full justify-center items-center mr-2 border ${
+        isActive ? 'bg-[#1E90FF] border-[#1E90FF]' : 'bg-white border-gray-400'
+      }`}>
+        <Text className="text-white text-xs font-bold text-center leading-6">
+          {isActive ? '✓' : ''}
+        </Text>
       </View>
-      <Text
-        style={[
-          studentStyles.stepText,
-          isActive ? studentStyles.stepTextActive : studentStyles.stepTextInactive,
-        ]}>
+      <Text 
+        className={`text-sm font-medium max-w-[70px] ${
+          isActive ? 'text-[#1E90FF]' : 'text-gray-400'
+        }`}
+        style={{ fontFamily: 'Poppins_500Medium' }}
+      >
         {title}
       </Text>
-      {step < 3 && <View style={studentStyles.stepDivider} />}
+      {step < 3 && <View className="w-4 h-px bg-gray-300 mx-2.5" />}
     </View>
   );
 
   const renderPersonalInfo = () => (
     <>
-      <View style={studentStyles.sectionHeader}>
-        <Text style={studentStyles.sectionTitle}>Personal Information</Text>
-        <Text style={studentStyles.sectionSubtitle}>Let's start with basic details</Text>
+      <View className="mb-8 mt-2">
+        <Text className="text-3xl font-bold text-black mb-1 max-w-[60%]" style={{ fontFamily: 'Poppins_600SemiBold' }}>
+          Personal Information
+        </Text>
+        <Text className="text-base text-gray-500" style={{ fontFamily: 'Poppins_400Regular' }}>
+          Let's start with basic details
+        </Text>
       </View>
 
-      <View style={studentStyles.formContainer}>
-        {/* @ts-ignore */}
+      <View className="gap-5 mb-12">
         <InputField
           placeholder="Enter Full Name"
           label="Full Name"
-          containerStyle={studentStyles.input as any}
+          value={fullName}
+          onChangeText={setFullName}
+          containerStyle="h-14 border border-gray-300 rounded-xl px-4 bg-white"
         />
-        {/* @ts-ignore */}
         <InputField
           placeholder="Enter Email Address"
           label="Email Address"
+          value={email}
+          onChangeText={setEmail}
           keyboardType="email-address"
-          containerStyle={studentStyles.input as any}
+          containerStyle="h-14 border border-gray-300 rounded-xl px-4 bg-white"
         />
-        {/* @ts-ignore */}
         <InputField
           placeholder="Enter Phone Number"
           label="Phone No."
+          value={phoneNumber}
+          onChangeText={setPhoneNumber}
           keyboardType="phone-pad"
-          containerStyle={studentStyles.input as any}
+          containerStyle="h-14 border border-gray-300 rounded-xl px-4 bg-white"
         />
       </View>
 
-      <Button title="Next" onPress={handleNext} style={studentStyles.nextButton} />
+      <Button 
+        title="Next" 
+        onPress={handleNext} 
+        className="h-14 bg-[#1E90FF] rounded-xl justify-center items-center mt-5"
+      />
     </>
   );
 
   const renderAcademicDetails = () => (
     <>
-      <View style={studentStyles.sectionHeader}>
-        <Text style={studentStyles.sectionTitle}>Academic Details</Text>
-        <Text style={studentStyles.sectionSubtitle}>Tell us about your course</Text>
+      <View className="mb-8 mt-2">
+        <Text className="text-3xl font-bold text-black mb-1 max-w-[60%]" style={{ fontFamily: 'Poppins_600SemiBold' }}>
+          Academic Details
+        </Text>
+        <Text className="text-base text-gray-500" style={{ fontFamily: 'Poppins_400Regular' }}>
+          Tell us about your course
+        </Text>
       </View>
 
-      <View style={studentStyles.formContainer}>
-        {/* @ts-ignore */}
+      <View className="gap-5 mb-12">
         <InputField
           placeholder="Enter GR Number"
           label="GR No."
-          containerStyle={studentStyles.input as any}
+          value={grNumber}
+          onChangeText={setGrNumber}
+          containerStyle="h-14 border border-gray-300 rounded-xl px-4 bg-white"
         />
 
-        <Text style={studentStyles.fieldLabel}>Department</Text>
-        <View style={studentStyles.chipContainer}>
+        <Text className="text-base text-black font-medium mb-2" style={{ fontFamily: 'Poppins_500Medium' }}>
+          Department
+        </Text>
+        <View className="flex-row flex-wrap gap-2.5 mb-5">
           {DEPARTMENTS.map((dept) => (
             <TouchableOpacity
               key={dept}
-              style={[
-                studentStyles.chip,
-                selectedDepartment === dept && studentStyles.chipSelected,
-              ]}
-              onPress={() => setSelectedDepartment(dept)}>
-              <Text
-                style={[
-                  studentStyles.chipText,
-                  selectedDepartment === dept && studentStyles.chipTextSelected,
-                ]}>
+              className={`px-4 py-2.5 rounded-lg border ${
+                selectedDepartment === dept
+                  ? 'border-[#1E90FF] bg-[#E8F2FF]'
+                  : 'border-gray-300 bg-white'
+              }`}
+              onPress={() => setSelectedDepartment(dept)}
+            >
+              <Text 
+                className={`text-sm ${
+                  selectedDepartment === dept ? 'text-[#1E90FF] font-bold' : 'text-gray-700'
+                }`}
+                style={{ fontFamily: 'Poppins_400Regular' }}
+              >
                 {dept}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <Text style={studentStyles.fieldLabel}>Academic Year</Text>
-        <View style={studentStyles.chipContainer}>
+        <Text className="text-base text-black font-medium mb-2" style={{ fontFamily: 'Poppins_500Medium' }}>
+          Academic Year
+        </Text>
+        <View className="flex-row flex-wrap gap-2.5 mb-5">
           {ACADEMIC_YEARS.map((year) => (
             <TouchableOpacity
               key={year}
-              style={[
-                studentStyles.chip,
-                selectedAcademicYear === year && studentStyles.chipSelected,
-              ]}
-              onPress={() => setSelectedAcademicYear(year)}>
-              <Text
-                style={[
-                  studentStyles.chipText,
-                  selectedAcademicYear === year && studentStyles.chipTextSelected,
-                ]}>
+              className={`px-4 py-2.5 rounded-lg border ${
+                selectedAcademicYear === year
+                  ? 'border-[#1E90FF] bg-[#E8F2FF]'
+                  : 'border-gray-300 bg-white'
+              }`}
+              onPress={() => setSelectedAcademicYear(year)}
+            >
+              <Text 
+                className={`text-sm ${
+                  selectedAcademicYear === year ? 'text-[#1E90FF] font-bold' : 'text-gray-700'
+                }`}
+                style={{ fontFamily: 'Poppins_400Regular' }}
+              >
                 {year}
               </Text>
             </TouchableOpacity>
@@ -201,51 +324,136 @@ export default function StudentRegistrationScreen() {
         </View>
       </View>
 
-      <Button title="Next" onPress={handleNext} style={studentStyles.nextButton} />
-    </>
-  );
-
-  const renderFaceRegistration = () => (
-    <>
-      <View style={studentStyles.sectionHeader}>
-        <Text style={studentStyles.sectionTitle}>Face Registration</Text>
-        <Text style={studentStyles.sectionSubtitle}>
-          For your secure, touchless attendance verification
-        </Text>
-      </View>
-
-      <View style={studentStyles.faceCaptureContainer}>
-        <View style={studentStyles.faceCaptureArea} />
-        <Button
-          title="Capture"
-          onPress={() => Alert.alert('Capture', 'Camera function triggered!')}
-          style={studentStyles.captureButton}
-        />
-      </View>
-
-      <Button
-        title="Register"
-        loading={loading}
-        onPress={handleNext}
-        style={studentStyles.nextButton}
+      <Button 
+        title="Next" 
+        onPress={handleNext} 
+        className="h-14 bg-[#1E90FF] rounded-xl justify-center items-center mt-5"
       />
     </>
   );
 
-  return (
-    <SafeAreaView style={studentStyles.safeArea}>
-      <StatusBar barStyle="dark-content" />
-      <ScrollView
-        contentContainerStyle={studentStyles.scrollViewContent}
-        keyboardShouldPersistTaps="handled">
-        <View style={studentStyles.headerContainer}>
-          <TouchableOpacity onPress={handleBack} style={studentStyles.backArrowButton}>
-            <Image source={require('../../../assets/arrow.png')} style={studentStyles.backArrow} />
-          </TouchableOpacity>
-          <Text style={studentStyles.pageTitle}>Student's Onboarding</Text>
+  const renderFaceRegistration = () => {
+    if (!hasPermission) {
+      return (
+        <View className="flex-1 items-center justify-center py-24">
+          <Text className="text-base text-gray-500 mb-5 text-center" style={{ fontFamily: 'Poppins_400Regular' }}>
+            Camera permission is required
+          </Text>
+          <Button
+            title="Grant Permission"
+            onPress={requestPermission}
+            className="h-14 bg-[#1E90FF] rounded-xl justify-center items-center"
+          />
+        </View>
+      );
+    }
+
+    if (!device) {
+      return (
+        <View className="flex-1 items-center justify-center py-24">
+          <Text className="text-base text-gray-500 text-center" style={{ fontFamily: 'Poppins_400Regular' }}>
+            No camera device found
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <>
+        <View className="mb-8 mt-2">
+          <Text className="text-3xl font-bold text-black mb-1 max-w-[60%]" style={{ fontFamily: 'Poppins_600SemiBold' }}>
+            Face Registration
+          </Text>
+          <Text className="text-base text-gray-500" style={{ fontFamily: 'Poppins_400Regular' }}>
+            For your secure, touchless attendance verification
+          </Text>
         </View>
 
-        <View style={studentStyles.onboardingStepsContainer}>
+        <View className="flex-1 items-center justify-center mb-12 mt-8">
+          {/* Camera/Image Container with proper overflow handling */}
+          <View className="w-[280px] h-[280px] rounded-full mb-8 overflow-hidden bg-gray-200">
+            {capturedImageUri ? (
+              <Image 
+                source={{ uri: capturedImageUri }} 
+                className="w-full h-full"
+                resizeMode="cover"
+              />
+            ) : (
+              <Camera
+                ref={camera}
+                style={{ width: '100%', height: '100%' }}
+                device={device}
+                isActive={currentStep === 3 && !capturedImageUri}
+                photo={true}
+              />
+            )}
+          </View>
+          
+          <View className="flex-row gap-2.5 mb-5">
+            {capturedImageUri && (
+              <Button
+                title="Retake"
+                onPress={() => {
+                  setCapturedImageUri(null);
+                  setEmbeddingSaved(false);
+                }}
+                className="h-16 w-36 bg-gray-500 rounded-xl justify-center items-center"
+              />
+            )}
+            <Button
+              title={embeddingSaved ? 'Captured ✓' : 'Capture Face'}
+              onPress={captureAndProcess}
+              disabled={isProcessing || embeddingSaved}
+              loading={isProcessing}
+              className={`h-16 w-36 rounded-xl justify-center items-center ${
+                embeddingSaved ? 'bg-green-500' : 'bg-[#1E90FF]'
+              }`}
+            />
+          </View>
+
+          {embeddingSaved && (
+            <View className="bg-green-50 px-5 py-2.5 rounded-2xl border border-green-500">
+              <Text className="text-green-900 font-semibold text-sm" style={{ fontFamily: 'Poppins_600SemiBold' }}>
+                ✓ Face registered successfully
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <Button
+          title="Complete Registration"
+          loading={loading}
+          onPress={handleNext}
+          disabled={!embeddingSaved}
+          className={`h-14 rounded-xl justify-center items-center ${
+            embeddingSaved ? 'bg-[#1E90FF]' : 'bg-gray-300'
+          }`}
+        />
+      </>
+    );
+  };
+
+  return (
+    <SafeAreaView className="flex-1 bg-white">
+      <StatusBar barStyle="dark-content" />
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 24, paddingTop: 20, paddingBottom: 40 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View className="mb-8 mt-10">
+          <TouchableOpacity onPress={handleBack} className="self-start pr-4 py-1 mb-2.5">
+            <Image 
+              source={require('../../../assets/arrow.png')} 
+              className="w-10 h-10 mb-5"
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+          <Text className="text-3xl font-bold text-black" style={{ fontFamily: 'Poppins_600SemiBold' }}>
+            Student's Onboarding
+          </Text>
+        </View>
+
+        <View className="flex-row items-center justify-start mb-10">
           <StepIndicator step={1} title="Personal Info." isActive={currentStep >= 1} />
           <StepIndicator step={2} title="Academic Info" isActive={currentStep >= 2} />
           <StepIndicator step={3} title="Face ID" isActive={currentStep === 3} />
@@ -260,165 +468,3 @@ export default function StudentRegistrationScreen() {
     </SafeAreaView>
   );
 }
-
-const studentStyles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#FFFFFF' },
-  scrollViewContent: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 20, paddingBottom: 40 },
-
-  headerContainer: { marginBottom: 30, marginTop: 40 },
-  backArrowButton: {
-    alignSelf: 'flex-start',
-    paddingRight: 15,
-    paddingVertical: 5,
-    marginBottom: 10,
-  },
-  backArrow: {
-    width: 40,
-    height: 40,
-    resizeMode: 'contain',
-    marginBottom: 20,
-  },
-  pageTitle: { fontSize: 28, fontWeight: 'bold', color: '#000', fontFamily: 'Poppins_600SemiBold' },
-
-  onboardingStepsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    marginBottom: 40,
-  },
-  stepItem: { flexDirection: 'row', alignItems: 'center' },
-  checkboxContainer: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  checkboxActive: { backgroundColor: '#1E90FF', borderColor: '#1E90FF', borderWidth: 1 },
-  checkboxInactive: { backgroundColor: '#FFFFFF', borderColor: '#A0A0A0', borderWidth: 1 },
-  checkboxIcon: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: 'bold',
-    lineHeight: 22,
-    textAlign: 'center',
-  },
-  stepText: { fontSize: 13, fontWeight: '500', fontFamily: 'Poppins_500Medium', maxWidth: 70 },
-  stepTextActive: { color: '#1E90FF' },
-  stepTextInactive: { color: '#A0A0A0', fontWeight: 'normal' },
-  stepDivider: { width: 15, height: 1, backgroundColor: '#D0D0D0', marginHorizontal: 10 },
-
-  sectionHeader: { marginBottom: 30, marginTop: 10 },
-  sectionTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#000',
-    fontFamily: 'Poppins_600SemiBold',
-    marginBottom: 5,
-    maxWidth: '60%',
-  },
-  sectionSubtitle: { fontSize: 16, color: '#777', fontFamily: 'Poppins_400Regular' },
-  formContainer: { gap: 20, marginBottom: 50 },
-
-  input: {
-    height: 55,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 12,
-    paddingHorizontal: 15,
-    backgroundColor: '#FFFFFF',
-    shadowColor: 'transparent',
-  } as any,
-
-  nextButton: {
-    height: 55,
-    backgroundColor: '#1E90FF',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 20,
-    fontFamily: 'Poppins_600SemiBold',
-  },
-
-  fieldLabel: { fontSize: 16, color: '#000', fontFamily: 'Poppins_500Medium', marginBottom: 8 },
-  chipContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
-  chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#D0D0D0',
-    backgroundColor: '#FFFFFF',
-  },
-  chipSelected: { 
-    borderColor: '#1E90FF', 
-    backgroundColor: '#E8F2FF' 
-},
-  chipText: { fontSize: 14, color: '#333', fontFamily: 'Poppins_400Regular' },
-  chipTextSelected: { color: '#1E90FF', fontWeight: 'bold' },
-
-  faceCaptureContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 50,
-    marginTop: 50,
-  },
-  faceCaptureArea: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: '#E0E0E0',
-    marginBottom: 30,
-  },
-  captureButton: {
-    height: 50,
-    width: 150,
-    backgroundColor: '#1E90FF',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  } as any,
-
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    width: '80%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 30,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 10,
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1E90FF',
-    marginBottom: 10,
-    fontFamily: 'Poppins_600SemiBold',
-  },
-  modalSubtitle: {
-    fontSize: 16,
-    color: '#555',
-    textAlign: 'center',
-    marginBottom: 30,
-    fontFamily: 'Poppins_400Regular',
-  },
-  modalButton: {
-    width: '100%',
-    height: 55,
-    backgroundColor: '#1E90FF',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
