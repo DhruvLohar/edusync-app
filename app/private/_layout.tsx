@@ -1,15 +1,26 @@
 import { Stack } from "expo-router";
-import { useEffect } from "react";
 import { useAuthStore } from "~/lib/store/auth.store";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import React from 'react';
 
 export default function ProtectedLayout() {
-
-    const { profile } = useAuthStore();
-
+    // NOTE: This file is simplified to ignore user profile and force the 'student' route.
+    
     return (
-        <Stack initialRouteName={"(tabs)"} screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="editprofile" options={{ headerShown: false }} />
-        </Stack>
-    )
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            {/* 🎯 FIX: REMOVE initialRouteName. Let the first declared Stack.Screen 
+               handle the initial route, which is (student) in this case. */}
+            <Stack screenOptions={{ headerShown: false }}>
+                
+                {/* The first Stack.Screen declared here becomes the initial screen. 
+                  Since we want the student page, we list it first.
+                */}
+                <Stack.Screen name="(student)" />
+                <Stack.Screen name="(teacher)" /> 
+                
+                {/* Keep other protected screens accessible */}
+                <Stack.Screen name="editprofile" options={{ headerShown: false }} />
+            </Stack>
+        </GestureHandlerRootView>
+    );
 }
