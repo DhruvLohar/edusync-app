@@ -129,17 +129,17 @@ const AttendanceList: React.FC<AttendanceListProps> = ({ isScanning, isSessionAc
         </View>
         
         {/* Live Attendance Header */}
-        <Text className="text-xl text-center font-bold text-gray-800 px-4 pb-2" style={{ fontFamily: 'Poppins_600SemiBold' }}>Live Attendance</Text>
+        <Text className="text-xl text-center  text-gray-800 px-4 pb-2" style={{ fontFamily: 'Poppins_600SemiBold' }}>Live Attendance</Text>
 
         {/* Tab Navigation */}
-        <View className="flex-row border-b border-gray-200 px-4 pb-0 pt-2">
+        <View className="flex-row justify-between px-20 pb-0 pt-2 mt-5">
           {/* Present Tab */}
           <TouchableOpacity
             onPress={() => setActiveTab('present')}
             className="mr-6 pb-2"
-            style={{ borderBottomWidth: activeTab === 'present' ? 2 : 0, borderBottomColor: '#2563eb' }}
+            style={{ borderBottomWidth: activeTab === 'present' ? 2 : 0, borderBottomColor: '#0095FF' }}
           >
-            <Text className={`text-lg font-bold ${activeTab === 'present' ? 'text-blue-600' : 'text-gray-500'}`}>
+            <Text className={`text-lg ${activeTab === 'present' ? 'text-[#0095FF]' : 'text-gray-500'}`} style={{ fontFamily: 'Poppins_400Regular' }}>
               Present ({presentStudents.length})
             </Text>
           </TouchableOpacity>
@@ -147,9 +147,9 @@ const AttendanceList: React.FC<AttendanceListProps> = ({ isScanning, isSessionAc
           <TouchableOpacity
             onPress={() => setActiveTab('pending')}
             className="pb-2"
-            style={{ borderBottomWidth: activeTab === 'pending' ? 2 : 0, borderBottomColor: '#2563eb' }}
+            style={{ borderBottomWidth: activeTab === 'pending' ? 2 : 0, borderBottomColor: '#0095FF' }}
           >
-            <Text className={`text-lg font-bold ${activeTab === 'pending' ? 'text-blue-600' : 'text-gray-500'}`}>
+            <Text className={`text-lg ${activeTab === 'pending' ? 'text-[#0095FF]' : 'text-gray-500'}`} style={{ fontFamily: 'Poppins_400Regular' }}>
               Pending ({pendingStudents.length})
             </Text>
           </TouchableOpacity>
