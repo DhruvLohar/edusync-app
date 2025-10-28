@@ -5,6 +5,8 @@ export const API_URL = 'http://192.168.29.121:8000'
 
 axios.defaults.baseURL = API_URL;
 
+axios.defaults.headers.common.Authorization = `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsInVzZXJUeXBlIjoidGVhY2hlciIsImlhdCI6MTc2MTY4MTYwOSwiZXhwIjoxNzYxOTQwODA5fQ.h3yhAIuMqvbpkcDggAiRtJaifkAgOi3rRYYj61VFQK8`;
+
 interface Session {
     access_token?: string;
     // Add other session properties if needed   
