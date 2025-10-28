@@ -16,10 +16,11 @@ interface AuthState {
   isLoading: boolean;
   isSessionInitialized: boolean;
 
-  getOTP: (id: string) => Promise<APIResponse>;
-  verifyOTP: (id: string, otp: number) => Promise<APIResponse>;
+  getOTP: (email: string) => Promise<APIResponse>;
+  verifyOTP: (email: string, otp: string) => Promise<APIResponse>;
   login: (values: any) => Promise<APIResponse>;
   register: (values: any) => Promise<APIResponse>;
+  resendOTP: (email: string) => Promise<APIResponse>;
   rehydrateSession: () => Promise<void>;
   logOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -39,21 +40,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     return await postToAPI(`/users/get-email`, { uid });
   },
 
-  async verifyOTP(uid: string, otp: number) {
-    const res = await postToAPI(`/users/verify-email`, { uid, otp });
+  async verifyOTP(email: string, otp: string) {
+    const res: APIResponse = await postToAPI('/users/auth/verify-otp', { email, otp });
 
     if (res.success) {
       const sessionData = { access_token: res.data.access_token };
       set({ session: sessionData });
       await setStorageItemAsync(STORAGE_KEY, sessionData); // Save to SecureStore
-      await get().refreshUser();
+      res.data.onboarding_done && (await get().refreshUser());
     }
 
     return res;
   },
 
   async login(values: any) {
-    return await postToAPI('/users/login', values);
+    return await postToAPI('/users/auth/login', values);
   },
 
   async register(values: any) {
@@ -80,10 +81,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-
   async refreshUser() {
-    try {
-      const res = await fetchFromAPI('/users/get-profile');
+       try {
+      const res = await fetchFromAPI('/users/profile');
       set({ profile: res?.data });
     } catch (error) {
       console.error('[refreshUser error]', error);
@@ -94,17 +94,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const session = get().session;
     if (!session || !session.access_token) {
       router.replace('/');
-      Alert.alert(
-        'Authentication Required',
-        'Please log in to access this page',
-        [
-          {
-            text: 'OK'
-          }
-        ]
-      );
+      Alert.alert('Authentication Required', 'Please log in to access this page', [
+        {
+          text: 'OK',
+        },
+      ]);
       return false;
     }
     return true;
+  },
+
+  async resendOTP(email: string) {
+    return await postToAPI('/users/auth/resend-otp', { email });
   },
 }));

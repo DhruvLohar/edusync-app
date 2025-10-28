@@ -18,7 +18,9 @@ export const RoleSelectionScreen = () => {
 
     const handleRoleSelection = (role: UserRole) => {
         setSelectedRole(role);
-        router.push(`/(auth)/register/${role}`);
+        if (role === 'teacher' || role === 'student') {
+            router.push(`/(auth)/register/${role}`);
+        }
     };
     
     const handleVisualSelection = (role: UserRole) => {

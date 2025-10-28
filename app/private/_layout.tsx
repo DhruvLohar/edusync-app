@@ -16,7 +16,7 @@ export default function ProtectedLayout() {
                   Since we want the student page, we list it first.
                 */}
                 <Stack.Screen name="(teacher)/(tabs)" /> 
-                {/* <Stack.Screen name="(student)/(tabs)" /> */}
+                <Stack.Screen name="(student)/(tabs)" />
 
                 
                 {/* Keep other protected screens accessible */}

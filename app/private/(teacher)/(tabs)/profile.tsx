@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, SafeAreaView, StatusBar, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useAuthStore } from '~/lib/store/auth.store';
+import { useRouter } from 'expo-router';
 
 // --- MOCK DATA ---
 const studentProfile = {
@@ -57,13 +59,13 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ iconName, title, value, isActio
 
 // --- MAIN SCREEN COMPONENT ---
 const ProfileScreen: React.FC = () => {
-    
-    const handleAction = (action: string) => {
+    const authStore = useAuthStore();
+    const router = useRouter();
+    const handleAction = async (action: string) => {
         console.log(`Action triggered: ${action}`);
-        // For 'Log Out', this is where AsyncStorage/session would be cleared
         if (action === 'Log Out') {
-            alert('Logging out...'); // Placeholder for actual logout logic
-            // router.replace('/(auth)');
+            await authStore.logOut();
+            router.replace('/(auth)');
         }
     };
 
