@@ -3,6 +3,8 @@ import { SafeAreaView, View, Text, StatusBar, StyleSheet, ScrollView, TouchableO
 import { useRouter } from 'expo-router';
 import { InputField } from '~/components/ui/Input';
 import { Button } from '~/components/ui/Button';
+import { postToAPI } from '~/lib/api';
+import { useAuthStore } from '~/lib/store/auth.store';
 
 const DEPARTMENTS = ['Computer Science', 'Information Technology', 'Mechanical', 'Electronics', 'AI/DS'];
 
@@ -41,12 +43,19 @@ const SuccessRegistrationModal: React.FC<SuccessModalProps> = ({ isVisible, onBa
 
 export default function TeacherRegistrationScreen() {
     const router = useRouter();
+    const authStore = useAuthStore();
     const [currentStep, setCurrentStep] = useState(1); 
     const [loading, setLoading] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     
     const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
     const [selectedAcademicYear, setSelectedAcademicYear] = useState<string | null>(null);
+
+    // Add state for form fields
+    const [fullName, setFullName] = useState('');
+    const [email, setEmail] = useState('');
+    const [phoneNumber, setPhoneNumber] = useState('');
+    const [employeeId, setEmployeeId] = useState('');
 
     const handleNext = () => {
         if (currentStep === 1) {
@@ -56,12 +65,32 @@ export default function TeacherRegistrationScreen() {
         }
     };
 
-    const handleFinalRegister = () => {
+    const handleFinalRegister = async () => {
         setLoading(true);
-        setTimeout(() => {
+        try {
+            const data = {
+                name: fullName,
+                email,
+                phone: phoneNumber,
+                user_type: 'teacher',
+                Department: selectedDepartment,
+                employee_id: employeeId,
+            };
+            console.log('Submitting Teacher Registration:', data);
+            const response = await postToAPI('/users/onboard', data, false, true);
+            console.log('Teacher Registration Response:', response);
+            if (response && response.success) {
+                await authStore.refreshUser();
+                setShowSuccessModal(true);
+                router.replace('/private/(teacher)/(tabs)');
+            } else {
+                Alert.alert('Registration Failed', response?.message || 'Unable to register.');
+            }
+        } catch (error) {
+            Alert.alert('Error', 'An error occurred during registration.');
+        } finally {
             setLoading(false);
-            setShowSuccessModal(true); 
-        }, 1500);
+        }
     };
 
     const handleBackToHome = () => {
@@ -94,11 +123,11 @@ export default function TeacherRegistrationScreen() {
 
             <View style={teacherStyles.formContainer}>
                 {/* @ts-ignore */}
-                <InputField placeholder="Enter Full Name" label="Full Name" containerStyle={teacherStyles.input} />
+                <InputField placeholder="Enter Full Name" label="Full Name" value={fullName} onChangeText={setFullName} containerStyle={teacherStyles.input} />
                 {/* @ts-ignore */}
-                <InputField placeholder="Enter Email Address" label="Email Address" keyboardType="email-address" containerStyle={teacherStyles.input} />
+                <InputField placeholder="Enter Email Address" label="Email Address" value={email} onChangeText={setEmail} keyboardType="email-address" containerStyle={teacherStyles.input} />
                 {/* @ts-ignore */}
-                <InputField placeholder="Enter Phone Number" label="Phone No." keyboardType="phone-pad" containerStyle={teacherStyles.input} />
+                <InputField placeholder="Enter Phone Number" label="Phone No." value={phoneNumber} onChangeText={setPhoneNumber} keyboardType="phone-pad" containerStyle={teacherStyles.input} />
             </View>
 
             <Button title="Next" onPress={handleNext} style={teacherStyles.nextButton} />
@@ -114,7 +143,7 @@ export default function TeacherRegistrationScreen() {
 
             <View style={teacherStyles.formContainer}>
                 {/* @ts-ignore */}
-                <InputField placeholder="Enter Employee ID" label="Employee ID" containerStyle={teacherStyles.input} />
+                <InputField placeholder="Enter Employee ID" label="Employee ID" value={employeeId} onChangeText={setEmployeeId} containerStyle={teacherStyles.input} />
                 
                 <Text style={teacherStyles.fieldLabel}>Department</Text>
                 <View style={teacherStyles.chipContainer}>

@@ -26,6 +26,10 @@ import {
   loadEmbedding,
   compareEmbeddings,
 } from '~/lib/ImageChecker'; // <<< ADDED (Assuming path)
+import { fetchFromAPI } from '~/lib/api';
+import { getSocket, disconnectSocket } from '~/lib/socket';
+import type { AttendanceRecord } from '~/type/Student';
+import type { LiveAttendance } from '~/type/LiveAttendance';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SIMILARITY_THRESHOLD = 0.6; // <<< ADDED: Confidence threshold
@@ -41,32 +45,7 @@ const beaconData = {
 };
 
 // --- RESTORED HISTORY DATA ---
-const historyData = [
-  {
-    id: 'h1',
-    course: 'Blockchain Lab',
-    details: 'CSE | SEM 7-A',
-    time: '10:00 AM',
-    date: '22 Oct 2025',
-    status: 'Present',
-  },
-  {
-    id: 'h2',
-    course: 'Data Structures',
-    details: 'IT | SEM 6-B',
-    time: '1:00 PM',
-    date: '21 Oct 2025',
-    status: 'Absent',
-  },
-  {
-    id: 'h3',
-    course: 'Web Development',
-    details: 'CS | SEM 7-A',
-    time: '9:00 AM',
-    date: '20 Oct 2025',
-    status: 'Present',
-  },
-];
+// const historyData = [ ... ]; // REMOVE THIS
 
 // Define the four phases of the screen state
 type ScanPhase = 'initial' | 'scanning' | 'detected' | 'faceCapture' | 'confirmed';
@@ -108,14 +87,13 @@ const stopPumpingAnimation = (
 };
 
 // --- RESTORED History Item Component ---
-const HistoryItem: React.FC<typeof historyData[0]> = ({
-  course,
-  details,
-  time,
-  date,
-  status,
+const HistoryItem: React.FC<AttendanceRecord> = ({
+  class: classInfo,
+  session,
+  is_present,
+  marked_at,
 }) => {
-  const barColor = status === 'Present' ? '#0095FF' : 'red';
+  const barColor = is_present ? '#0095FF' : 'red';
   return (
     <View className="flex-row justify-between items-center bg-white py-3 pr-4 mb-1">
       {/* Left Status Bar */}
@@ -126,14 +104,25 @@ const HistoryItem: React.FC<typeof historyData[0]> = ({
 
       {/* Course Details */}
       <View className="flex-1">
-        <Text className="text-lg font-semibold text-gray-900">{course}</Text>
-        <Text className="text-sm text-gray-500">{details}</Text>
+        <Text className="text-lg font-semibold text-gray-900">
+          {classInfo.subject}
+        </Text>
+        <Text className="text-sm text-gray-500">
+          {classInfo.department} | {classInfo.year}
+        </Text>
       </View>
 
       {/* Time and Date */}
       <View className="items-end">
-        <Text className="text-base text-gray-800">{time}</Text>
-        <Text className="text-xs text-gray-500">{date}</Text>
+        <Text className="text-base text-gray-800">
+          {new Date(session.start_time).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+        </Text>
+        <Text className="text-xs text-gray-500">
+          {new Date(session.start_time).toLocaleDateString()}
+        </Text>
       </View>
     </View>
   );
@@ -143,6 +132,11 @@ const HistoryItem: React.FC<typeof historyData[0]> = ({
 const StudentHomeScreen: React.FC = () => {
   const [scanPhase, setScanPhase] = useState<ScanPhase>('initial');
   const [modalVisible, setModalVisible] = useState<boolean>(false);
+  const [history, setHistory] = useState<AttendanceRecord[]>([]);
+  const [profile, setProfile] = useState<any>(null);
+  const [liveAttendance, setLiveAttendance] = useState<LiveAttendance | null>(null);
+  const [socket, setSocket] = useState<any>(null);
+  const [isSocketConnected, setIsSocketConnected] = useState(false);
 
   // --- ADDED FOR CAMERA & VERIFICATION ---
   const camera = useRef<Camera>(null);
@@ -192,39 +186,92 @@ const StudentHomeScreen: React.FC = () => {
   }, []);
   // --- END ADDED ---
 
-  const handleTapToScan = () => {
+  // --- ADDED: Fetch attendance history from backend ---
+  useEffect(() => {
+    // Fetch attendance history from backend
+    const fetchHistory = async () => {
+      const res = await fetchFromAPI<{ records: AttendanceRecord[] }>('/students/history');
+      if (res && res.success && res.data && Array.isArray(res.data.records)) {
+        setHistory(res.data.records);
+      } else {
+        setHistory([]);
+      }
+    };
+    fetchHistory();
+  }, []);
+  // --- END ADDED ---
+
+  // --- ADDED: Fetch student profile on mount ---
+  useEffect(() => {
+    // Fetch student profile from backend
+    const fetchProfile = async () => {
+      const res = await fetchFromAPI<any>('/users/profile');
+      if (res && res.success && res.data) {
+        setProfile(res.data);
+      } else {
+        setProfile(null);
+      }
+    };
+    fetchProfile();
+  }, []);
+  // --- END ADDED ---
+
+  // --- SOCKET CLEANUP ON UNMOUNT ---
+  useEffect(() => {
+    return () => {
+      disconnectSocket();
+    };
+  }, []);
+
+  // --- MODIFIED: Tap to Scan triggers live attendance fetch and socket connect ---
+  const handleTapToScan = async () => {
     if (scanPhase !== 'initial') return;
     setScanPhase('scanning');
-
-    setTimeout(() => {
-      setScanPhase('detected');
-      setModalVisible(true);
-    }, 2000);
-  };
-
-  // --- MODIFIED: Check permissions before opening camera ---
-  const handleFaceScan = async () => {
-    if (!hasPermission) {
-      const permissionGranted = await requestPermission();
-      if (!permissionGranted) {
-        Alert.alert('Permission required', 'Camera permission is required to verify your face.');
-        return;
-      }
-    }
-    if (!device) {
-      Alert.alert('Error', 'No front camera device found.');
+    // 1. Fetch live attendance
+    const res = await fetchFromAPI<{ id: number; live_id: string; start_time: string; class: any; already_marked: boolean; attendance_record: any }>('/students/live-attendance');
+    if (!res || !res.success || !res.data || !res.data.live_id) {
+      setScanPhase('initial');
+      Alert.alert('No Session', 'No live attendance session found.');
       return;
     }
-
-    setModalVisible(false); // Close Beacon Modal
-    setScanPhase('faceCapture');
-    setCapturedImageUri(null); // Reset any previous capture
-    setIsProcessing(false);
-    setTimeout(() => setModalVisible(true), 100);
+    setLiveAttendance(res.data);
+    // 2. Connect to socket
+    const sock = await getSocket();
+    setSocket(sock);
+    sock.connect();
+    sock.on('connect', () => {
+      setIsSocketConnected(true);
+      // 3. Join attendance session
+      sock.emit('join_attendance', { live_id: res.data.live_id });
+    });
+    sock.on('joined_attendance', (data: any) => {
+      setScanPhase('detected');
+      setModalVisible(true);
+    });
+    sock.on('presence_marked', (data: any) => {
+      setScanPhase('confirmed');
+      setModalVisible(true);
+      // Optionally refresh history
+      setTimeout(() => {
+        setModalVisible(false);
+        setScanPhase('initial');
+        setLiveAttendance(null);
+        fetchHistory();
+      }, 3000);
+    });
+    sock.on('auth_error', (data: any) => {
+      Alert.alert('Socket Error', data.message || 'Authentication failed');
+      setScanPhase('initial');
+      setModalVisible(false);
+    });
+    sock.on('error', (data: any) => {
+      Alert.alert('Socket Error', data.message || 'Unknown error');
+      setScanPhase('initial');
+      setModalVisible(false);
+    });
   };
-  // --- END MODIFIED ---
 
-  // --- REPLACED: This now performs the full verification ---
+  // --- MODIFIED: Face scan triggers mark_present on socket ---
   const handleCaptureAndVerify = async () => {
     if (!camera.current) {
       Alert.alert('Error', 'Camera not ready');
@@ -267,17 +314,18 @@ const StudentHomeScreen: React.FC = () => {
 
       if (isMatch) {
         // 5. SUCCESS: Proceed to confirmation
-        console.log(`✅ Verification Successful! Similarity: ${similarity}`);
+        if (socket && liveAttendance?.live_id) {
+          socket.emit('mark_present', { live_id: liveAttendance.live_id });
+        }
         setModalVisible(false); // Close Face Capture Modal
         setScanPhase('confirmed');
-
         setTimeout(() => {
           setModalVisible(true); // Show Confirmation Modal
         }, 100);
-
         setTimeout(() => {
           setModalVisible(false);
           setScanPhase('initial'); // Reset to initial state
+          setLiveAttendance(null);
         }, 3000);
       } else {
         // 6. FAILURE: Show alert and allow retry
@@ -349,6 +397,45 @@ const StudentHomeScreen: React.FC = () => {
   };
   // --- END ADDED ---
 
+  // Helper to fix local photo URL if needed
+  const getProfilePhotoUrl = (url?: string | null) => {
+    if (!url) return undefined;
+    if (url.startsWith('http://127.0.0.1:8000')) {
+      return url.replace('http://127.0.0.1:8000', 'http://192.168.29.121:8000');
+    }
+    return url;
+  };
+
+  // --- Helper to fetch history (for refresh after marking) ---
+  const fetchHistory = async () => {
+    const res = await fetchFromAPI<{ records: AttendanceRecord[] }>('/students/history');
+    if (res && res.success && res.data && Array.isArray(res.data.records)) {
+      setHistory(res.data.records);
+    } else {
+      setHistory([]);
+    }
+  };
+
+  // --- MODIFIED: Check permissions before opening camera ---
+  const handleFaceScan = async () => {
+    if (!hasPermission) {
+      const permissionGranted = await requestPermission();
+      if (!permissionGranted) {
+        Alert.alert('Permission required', 'Camera permission is required to verify your face.');
+        return;
+      }
+    }
+    if (!device) {
+      Alert.alert('Error', 'No front camera device found.');
+      return;
+    }
+    setModalVisible(false); // Close Beacon Modal
+    setScanPhase('faceCapture');
+    setCapturedImageUri(null); // Reset any previous capture
+    setIsProcessing(false);
+    setTimeout(() => setModalVisible(true), 100);
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-white">
       <StatusBar barStyle="dark-content" />
@@ -362,7 +449,15 @@ const StudentHomeScreen: React.FC = () => {
         >
           {/* Header (Greeting & Settings Icon) */}
           <View className="w-full flex-row justify-between items-center py-4 mt-8">
-            <View className="w-12 h-12 rounded-full bg-gray-200" />
+                      {profile && profile.profile_photo ? (
+            <Image
+              source={{ uri: getProfilePhotoUrl(profile.profile_photo) }}
+              className="w-24 h-24 rounded-full border-4 border-white shadow-md mb-2"
+              style={{ width: 96, height: 96, borderRadius: 48, marginBottom: 8 }}
+            />
+          ) : (
+            <View className="w-24 h-24 rounded-full bg-gray-300 border-4 border-white shadow-md mb-2" />
+          )}
             <View className="flex-1 ml-4">
               <Text
                 className="text-lg text-gray-600 mb-0"
@@ -374,7 +469,7 @@ const StudentHomeScreen: React.FC = () => {
                 className="text-2xl text-gray-900"
                 style={{ fontFamily: 'Poppins_600SemiBold' }}
               >
-                {studentName}
+                            {profile?.name || 'Student'}
               </Text>
             </View>
             <TouchableOpacity className="p-2 border border-gray-300 rounded-full">
@@ -461,7 +556,7 @@ const StudentHomeScreen: React.FC = () => {
 
           {/* --- Attendance History Section --- */}
           <View
-            className="bg-white rounded-t-3xl -mx-5 pb-5 pt-3"
+            className="bg-white rounded-t-3xl -mx-5 pb-5 pt-3 h-full"
             style={styles.historyContainer}
           >
             {/* History Header */}
@@ -473,11 +568,17 @@ const StudentHomeScreen: React.FC = () => {
             </Text>
 
             {/* History List */}
-            {historyData.map((item) => (
-              <View key={item.id} className="px-5">
-                <HistoryItem {...item} />
+            {history.length > 0 ? (
+              history.map((item) => (
+                <View key={item.id} className="px-5">
+                  <HistoryItem {...item} />
+                </View>
+              ))
+            ) : (
+              <View className="px-5">
+                <Text className="text-gray-500">No attendance records found.</Text>
               </View>
-            ))}
+            )}
           </View>
         </ScrollView>
       </View>
@@ -493,7 +594,7 @@ const StudentHomeScreen: React.FC = () => {
           style={styles.modalOverlay}
         >
           {/* --- Stage 2: BEACON DETECTED --- */}
-          {scanPhase === 'detected' && (
+          {scanPhase === 'detected' && liveAttendance && (
             <View className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl items-center">
               <Text
                 className="text-2xl text-[#0095FF] mb-5"
@@ -506,18 +607,18 @@ const StudentHomeScreen: React.FC = () => {
               <View className="flex-row justify-between w-full items-center mb-8 px-2">
                 <View>
                   <Text className="text-lg font-semibold text-gray-800">
-                    {beaconData.course}
+                    {liveAttendance.class.subject}
                   </Text>
                   <Text className="text-sm text-gray-500">
-                    {beaconData.details}
+                    {liveAttendance.class.department} | {liveAttendance.class.year}
                   </Text>
                 </View>
                 <View className="items-end">
                   <Text className="text-base text-gray-800 font-medium">
-                    {beaconData.time}
+                    {new Date(liveAttendance.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </Text>
                   <Text className="text-xs text-gray-500">
-                    {beaconData.date}
+                    {new Date(liveAttendance.start_time).toLocaleDateString()}
                   </Text>
                 </View>
               </View>
@@ -594,13 +695,13 @@ const StudentHomeScreen: React.FC = () => {
                 className="text-lg  text-gray-600"
                 style={{ fontFamily: 'Poppins_400Regular' }}
               >
-                Marked present for {beaconData.course} ({beaconData.details})
+                Marked present for {liveAttendance?.class?.subject || beaconData.course} ({liveAttendance?.class?.department || beaconData.details})
               </Text>
               <Text
                 className="text-base text-gray-500 mt-1"
                 style={{ fontFamily: 'Poppins_400Regular' }}
               >
-                {beaconData.date}, {beaconData.timeRange}
+                {liveAttendance ? new Date(liveAttendance.start_time).toLocaleDateString() : beaconData.date}, {liveAttendance ? new Date(liveAttendance.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : beaconData.timeRange}
               </Text>
             </View>
           )}

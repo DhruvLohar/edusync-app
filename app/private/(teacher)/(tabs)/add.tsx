@@ -8,6 +8,7 @@ import AnimatedReanimated, { useSharedValue, useAnimatedStyle, withSpring } from
 import AttendanceList from '../../../../components/custom/BLE/AttendanceList'; // The list component
 import { fetchFromAPI, postToAPI } from '~/lib/api';
 import { Attendance, Class } from '~/type/Teacher';
+import { BottomModal } from '../../../../components/ui/BottomModal';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const INITIAL_HEIGHT = SCREEN_HEIGHT * 0.50; // Initial sheet height
@@ -99,7 +100,7 @@ const TeacherBeaconSession: React.FC<{ selectedCourse: Class | null }> = ({ sele
   const sheetY = useSharedValue(INITIAL_HEIGHT);
   const context = useSharedValue(0);
 
-  const gesture = Gesture.Pan()
+const gesture = Gesture.Pan()
     .onStart(() => {
       context.value = sheetY.value;
     })
@@ -111,8 +112,13 @@ const TeacherBeaconSession: React.FC<{ selectedCourse: Class | null }> = ({ sele
     })
     .onEnd(() => {
       if (sheetY.value > INITIAL_HEIGHT + 50) {
+        // User dragged UP (sheet is TALLER), snap to MAX
         sheetY.value = withSpring(MAX_HEIGHT, { damping: 50, stiffness: 200 });
+      } else if (sheetY.value < INITIAL_HEIGHT - 50) {
+        // User dragged DOWN (sheet is SHORTER), snap to MIN
+        sheetY.value = withSpring(MIN_HEIGHT, { damping: 50, stiffness: 200 });
       } else {
+        // User didn't drag far enough, snap back to INITIAL
         sheetY.value = withSpring(INITIAL_HEIGHT, { damping: 50, stiffness: 200 });
       }
     });
@@ -226,24 +232,16 @@ const TeacherBeaconSession: React.FC<{ selectedCourse: Class | null }> = ({ sele
         </View>
 
         {(isTransitioning || isSessionActive) && (
-          <GestureDetector gesture={gesture}>
-            <AnimatedReanimated.View
-              style={[
-                { position: 'absolute', width: '100%', top: 0 },
-                animatedSheetStyle,
-                { zIndex: 1000 }
-              ]}
-            >
-              <AttendanceList
-                isScanning={!isSessionActive}
-                isSessionActive={isSessionActive}
-                onEndSession={handleEndSession}
-                sheetY={sheetY}
-                attendance={attendance}
-                students={selectedCourse?.students || []}
-              />
-            </AnimatedReanimated.View>
-          </GestureDetector>
+          <BottomModal isVisible={true} onClose={() => {}}>
+            <AttendanceList
+              isScanning={!isSessionActive}
+              isSessionActive={isSessionActive}
+              onEndSession={handleEndSession}
+              sheetY={sheetY}
+              attendance={attendance}
+              students={selectedCourse?.students || []}
+            />
+          </BottomModal>
         )}
       </View>
     </SafeAreaView>

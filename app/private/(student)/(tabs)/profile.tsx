@@ -1,22 +1,130 @@
-import React from 'react';
-import { View, Text, SafeAreaView, StatusBar, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, SafeAreaView, StatusBar, ScrollView, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useAuthStore } from '~/lib/store/auth.store';
 import { useRouter } from 'expo-router';
+import { fetchFromAPI } from '~/lib/api';
+import type { Student } from '~/type/Student';
+import { useAuthStore } from '~/lib/store/auth.store';
 
-// --- MOCK DATA ---
-const studentProfile = {
-    name: "Nandani Kadave",
-    id: "2023CS007",
-    department: "Computer Science & Engineering",
-    email: "nandani.k@student.edu",
-    
-    // >>> ADDED REGISTRATION DETAILS <<<
-    course: "B.Tech",
-    year: "4th Year",
-    semester: "Semester 7",
-    dob: "15th June 2003",
-    phone: "+91 98765 43210"
+// --- MAIN SCREEN COMPONENT ---
+const ProfileScreen: React.FC = () => {
+    const router = useRouter();
+    const [profile, setProfile] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    const Authstore = useAuthStore();
+    const handleAction = async (action: string) => {
+        if (action === 'Log Out') {
+            await Authstore.logOut();
+            router.replace('/(auth)');
+        }
+    };
+
+    useEffect(() => {
+        const fetchProfile = async () => {
+            setLoading(true);
+            const res = await fetchFromAPI<any>('/users/profile');
+            if (res && res.success && res.data) {
+                setProfile(res.data);
+            } else {
+                setProfile(null);
+            }
+            setLoading(false);
+        };
+        fetchProfile();
+    }, []);
+
+    // Helper to fix local photo URL if needed
+    const getProfilePhotoUrl = (url?: string | null) => {
+        if (!url) return undefined;
+        if (url.startsWith('http://127.0.0.1:8000')) {
+            return url.replace('http://127.0.0.1:8000', 'http://192.168.29.121:8000');
+        }
+        return url;
+    };
+
+    if (loading) {
+        return (
+            <SafeAreaView className="flex-1 bg-white items-center justify-center">
+                <StatusBar barStyle="dark-content" />
+                <Text className="text-lg text-gray-600">Loading profile...</Text>
+            </SafeAreaView>
+        );
+    }
+
+    if (!profile) {
+        return (
+            <SafeAreaView className="flex-1 bg-white items-center justify-center">
+                <StatusBar barStyle="dark-content" />
+                <Text className="text-lg text-gray-600">Profile not found.</Text>
+            </SafeAreaView>
+        );
+    }
+
+    return (
+        <SafeAreaView className="flex-1 bg-white">
+            <StatusBar barStyle="dark-content" />
+            <ScrollView className="flex-1 mb-20 mt-5" showsVerticalScrollIndicator={false} style={styles.container}>
+                {/* --- HEADER AND PROFILE INFO --- */}
+                <View className="items-center pt-10 pb-6">
+                    {/* Profile Picture */}
+                    {profile.profile_photo ? (
+                        <Image
+                            source={{ uri: getProfilePhotoUrl(profile.profile_photo) }}
+                            className="w-24 h-24 rounded-full border-4 border-white shadow-md mb-4"
+                            style={{ width: 96, height: 96, borderRadius: 48, marginBottom: 16 }}
+                        />
+                    ) : (
+                        <View className="w-24 h-24 rounded-full bg-gray-300 border-4 border-white shadow-md mb-4" />
+                    )}
+                    {/* Name and ID */}
+                    <Text className="text-3xl font-bold text-gray-900 mb-1" style={{ fontFamily: 'Poppins_600SemiBold' }}>
+                        {profile.name}
+                    </Text>
+                    <Text className="text-base text-gray-500">ID: {profile.id}</Text>
+                </View>
+                {/* --- SECTIONS --- */}
+                <View className="px-5 mt-4">
+                    {/* Section 1: BASIC DETAILS */}
+                    <Text className="text-lg font-semibold text-gray-600 mb-2" style={styles.sectionHeader}>
+                        Profile Details
+                    </Text>
+                    <View className="rounded-xl overflow-hidden px-4" style={styles.sectionCard}>
+                        <ProfileRow iconName="person-outline" title="Name" value={profile.name} />
+                        <ProfileRow iconName="at-outline" title="Email" value={profile.email} />
+                        <ProfileRow iconName="call-outline" title="Phone" value={profile.phone} />
+                        <ProfileRow iconName="school-outline" title="User Type" value={profile.user_type} />
+                    </View>
+                    {/* Section 2: ACTIONS AND LOGOUT */}
+                    <Text className="text-lg font-semibold text-gray-600 mb-2 mt-6" style={styles.sectionHeader}>
+                        Settings & Security
+                    </Text>
+                    <View className="rounded-xl overflow-hidden px-4" style={styles.sectionCard}>
+                        <ProfileRow 
+                            iconName="notifications-outline" 
+                            title="Notifications" 
+                            isAction 
+                            onPress={() => handleAction('Notifications')} 
+                        />
+                        {/* LOGOUT BUTTON (Clearly styled and separated) */}
+                        <TouchableOpacity 
+                            className="flex-row items-center justify-between py-4"
+                            onPress={() => handleAction('Log Out')}
+                        >
+                            <View className="flex-row items-center">
+                                {/* Use red for danger/logout action */}
+                                <View className="w-8 h-8 rounded-full bg-red-100 items-center justify-center mr-4">
+                                    <Ionicons name="log-out-outline" size={18} color="red" />
+                                </View>
+                                <Text className="text-base font-medium text-red-600">Log Out</Text>
+                            </View>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+                {/* Spacer */}
+                <View className="h-20" /> 
+            </ScrollView>
+        </SafeAreaView>
+    );
 };
 
 // --- REUSABLE PROFILE ROW COMPONENT ---
@@ -53,96 +161,6 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ iconName, title, value, isActio
                 <Ionicons name="chevron-forward-outline" size={20} color="gray" />
             ) : null}
         </TouchableOpacity>
-    );
-};
-
-
-// --- MAIN SCREEN COMPONENT ---
-const ProfileScreen: React.FC = () => {
-    const authStore = useAuthStore();
-    const router = useRouter();
-    const handleAction = async (action: string) => {
-        console.log(`Action triggered: ${action}`);
-        if (action === 'Log Out') {
-            await authStore.logOut();
-            router.replace('/(auth)');
-        }
-    };
-
-    return (
-        <SafeAreaView className="flex-1 bg-white">
-            <StatusBar barStyle="dark-content" />
-
-            <ScrollView className="flex-1 mb-20 mt-5" showsVerticalScrollIndicator={false} style={styles.container}>
-                
-                {/* --- HEADER AND PROFILE INFO --- */}
-                <View className="items-center pt-10 pb-6">
-                    {/* Profile Picture Placeholder */}
-                    <View className="w-24 h-24 rounded-full bg-gray-300 border-4 border-white shadow-md mb-4" />
-                    
-                    {/* Name and ID */}
-                    <Text className="text-3xl font-bold text-gray-900 mb-1" style={{ fontFamily: 'Poppins_600SemiBold' }}>
-                        {studentProfile.name}
-                    </Text>
-                    <Text className="text-base text-gray-500">{studentProfile.id}</Text>
-                </View>
-
-                {/* --- SECTIONS --- */}
-                <View className="px-5 mt-4">
-                    
-                    {/* Section 1: ACADEMIC DETAILS */}
-                    <Text className="text-lg font-semibold text-gray-600 mb-2" style={styles.sectionHeader}>
-                        Academic Details
-                    </Text>
-                    <View className="rounded-xl overflow-hidden px-4" style={styles.sectionCard}>
-                        <ProfileRow iconName="library-outline" title="Course" value={studentProfile.course} />
-                        <ProfileRow iconName="school-outline" title="Department" value={studentProfile.department} />
-                        <ProfileRow iconName="calendar-outline" title="Year" value={studentProfile.year} />
-                        <ProfileRow iconName="document-text-outline" title="Semester" value={studentProfile.semester} />
-                    </View>
-                    
-                    {/* Section 2: PERSONAL/CONTACT DETAILS */}
-                    <Text className="text-lg font-semibold text-gray-600 mb-2 mt-6" style={styles.sectionHeader}>
-                        Personal & Contact
-                    </Text>
-                    <View className="rounded-xl overflow-hidden px-4" style={styles.sectionCard}>
-                        <ProfileRow iconName="at-outline" title="Email" value={studentProfile.email} />
-                        <ProfileRow iconName="call-outline" title="Phone" value={studentProfile.phone} />
-                        <ProfileRow iconName="gift-outline" title="Date of Birth" value={studentProfile.dob} />
-                    </View>
-
-
-                    {/* Section 3: ACTIONS AND LOGOUT */}
-                    <Text className="text-lg font-semibold text-gray-600 mb-2 mt-6" style={styles.sectionHeader}>
-                        Settings & Security
-                    </Text>
-                    <View className="rounded-xl overflow-hidden px-4" style={styles.sectionCard}>
-                        <ProfileRow 
-                            iconName="notifications-outline" 
-                            title="Notifications" 
-                            isAction 
-                            onPress={() => handleAction('Notifications')} 
-                        />
-                        {/* LOGOUT BUTTON (Clearly styled and separated) */}
-                        <TouchableOpacity 
-                            className="flex-row items-center justify-between py-4"
-                            onPress={() => handleAction('Log Out')}
-                        >
-                            <View className="flex-row items-center">
-                                {/* Use red for danger/logout action */}
-                                <View className="w-8 h-8 rounded-full bg-red-100 items-center justify-center mr-4">
-                                    <Ionicons name="log-out-outline" size={18} color="red" />
-                                </View>
-                                <Text className="text-base font-medium text-red-600">Log Out</Text>
-                            </View>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                {/* Spacer */}
-                <View className="h-20" /> 
-            </ScrollView>
-        </SafeAreaView>
     );
 };
 

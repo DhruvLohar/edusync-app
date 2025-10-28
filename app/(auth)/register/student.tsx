@@ -17,7 +17,7 @@ import { Button } from '~/components/ui/Button';
 import { getFaceEmbedding, saveEmbedding } from '~/lib/ImageChecker';
 import { postToAPI } from '~/lib/api';
 import { RegistrationResponse } from '~/types/auth';
-
+import { useAuthStore } from '~/lib/store/auth.store';
 const DEPARTMENTS = [
   'Computer Science',
   'Information Technology',
@@ -63,6 +63,7 @@ export default function StudentRegistrationScreen() {
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const authStore = useAuthStore();
 
   // Personal Info
   const [fullName, setFullName] = useState('');
@@ -208,6 +209,7 @@ export default function StudentRegistrationScreen() {
       const response = await postToAPI<RegistrationResponse>('/users/onboard', formData, true, true);
       console.log('Registration Response:', response);
       if (response && response.success) {
+        await authStore.refreshUser();
         setShowSuccessModal(true);
         router.replace('/private/(student)/(tabs)');
       } else {

@@ -1,8 +1,8 @@
-import React from 'react';
-import { View, Text, SafeAreaView, StatusBar, ScrollView, TouchableOpacity, Dimensions, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, SafeAreaView, StatusBar, ScrollView, TouchableOpacity, Dimensions, StyleSheet, Image } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-// >>> IMPORT LINEAR GRADIENT <<<
 import { LinearGradient } from 'expo-linear-gradient'; 
+import { fetchFromAPI } from '~/lib/api';
 
 // --- MOCK DATA ---
 interface ClassAttendance {
@@ -105,8 +105,61 @@ const AttendanceCard: React.FC<ClassAttendance> = ({ name, department, time, dat
 
 // --- MAIN SCREEN COMPONENT ---
 const HomeScreen: React.FC = () => {
-    const userName = "Prof. Satish Ket"; 
-    
+    const [classes, setClasses] = useState<ClassAttendance[]>([]);
+    const [teacherName, setTeacherName] = useState<string>('');
+    const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
+
+    useEffect(() => {
+        // Fetch teacher profile for name and photo
+        const fetchProfile = async () => {
+            const res = await fetchFromAPI<any>('/users/profile');
+            if (res && res.success && res.data) {
+                setTeacherName(res.data.name || 'Teacher');
+                let url = res.data.profile_photo;
+                if (url && url.startsWith('http://127.0.0.1:8000')) {
+                    url = url.replace('http://127.0.0.1:8000', 'http://192.168.29.121:8000');
+                }
+                setProfilePhoto(url || null);
+            }
+        };
+        fetchProfile();
+    }, []);
+
+    useEffect(() => {
+        // Fetch teacher attendance history
+        const fetchHistory = async () => {
+            const res = await fetchFromAPI<any>('/teachers/history');
+            if (res && res.success && Array.isArray(res.data)) {
+                // Map backend data to ClassAttendance[]
+                const mapped = res.data.map((attendance: any) => {
+                    const classInfo = attendance.class || {};
+                    const presentCount = attendance.summary?.total_present || 0;
+                    const totalCapacity = attendance.summary?.total_students || 0;
+                    const progress = totalCapacity > 0 ? presentCount / totalCapacity : 0;
+                    // Format time and date
+                    const start = attendance.start_time ? new Date(attendance.start_time) : null;
+                    const end = attendance.end_time ? new Date(attendance.end_time) : null;
+                    const time = start && end ? `${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : '';
+                    const date = start ? start.toLocaleDateString() : '';
+                    return {
+                        id: attendance.id.toString(),
+                        name: classInfo.subject || '',
+                        department: classInfo.department || '',
+                        time,
+                        date,
+                        presentCount,
+                        totalCapacity,
+                        progress,
+                    };
+                });
+                setClasses(mapped);
+            } else {
+                setClasses([]);
+            }
+        };
+        fetchHistory();
+    }, []);
+
     const getGreeting = () => {
         const hour = new Date().getHours();
         if (hour < 12) return 'Good Morning,';
@@ -118,16 +171,15 @@ const HomeScreen: React.FC = () => {
     return (
         <SafeAreaView className="flex-1 bg-white"> 
             <StatusBar barStyle="dark-content" />
-
-            {/* Main Content Scrollable Area */}
             <ScrollView className="flex-1 px-5" showsVerticalScrollIndicator={false}>
-                
                 {/* Header (Greeting & Settings Icon) */}
                 <View className="flex-row justify-between items-center py-4 mt-8">
-                    {/* User Profile Placeholder Circle */}
-                    <View className="w-12 h-12 rounded-full bg-gray-200 border-2 border-white shadow-sm" /> 
-                    
-                    {/* Settings Icon (Top Right) */}
+                    {/* User Profile Photo */}
+                    {profilePhoto ? (
+                        <Image source={{ uri: profilePhoto }} className="w-12 h-12 rounded-full border-2 border-white shadow-sm" style={{ width: 48, height: 48, borderRadius: 24 }} />
+                    ) : (
+                        <View className="w-12 h-12 rounded-full bg-gray-200 border-2 border-white shadow-sm" />
+                    )}
                     <TouchableOpacity className="p-2 border border-gray-300 rounded-full">
                         <Ionicons name="settings-outline" size={24} color="black" />
                     </TouchableOpacity>
@@ -139,7 +191,7 @@ const HomeScreen: React.FC = () => {
                         {greeting}
                     </Text>
                     <Text className="text-4xl font-bold text-gray-900" style={{ fontFamily: 'Poppins_600SemiBold' }}>
-                        {userName}
+                        {teacherName}
                     </Text>
                 </View>
 
@@ -151,17 +203,17 @@ const HomeScreen: React.FC = () => {
                 </View>
 
                 {/* List of Attendance Cards */}
-                {mockClasses.map(classData => (
-                    <AttendanceCard key={classData.id} {...classData} />
-                ))}
+                {classes.length > 0 ? (
+                    classes.map(classData => (
+                        <AttendanceCard key={classData.id} {...classData} />
+                    ))
+                ) : (
+                    <Text className="text-gray-500">No attendance records found.</Text>
+                )}
 
                 {/* Extra padding to ensure last card is visible above the tab bar */}
                 <View className="h-20" /> 
-                
             </ScrollView>
-            
-            
-            
         </SafeAreaView>
     );
 };
