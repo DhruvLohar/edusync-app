@@ -201,7 +201,6 @@ const StudentHomeScreen: React.FC = () => {
                 </ScrollView>
             </View>
 
-            {/* --- MODALS (Defined outside the ScrollView, inside the SafeAreaView) --- */}
             <Modal
                 animationType="fade"
                 transparent={true}
