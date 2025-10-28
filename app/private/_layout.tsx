@@ -15,8 +15,9 @@ export default function ProtectedLayout() {
                 {/* The first Stack.Screen declared here becomes the initial screen. 
                   Since we want the student page, we list it first.
                 */}
-                <Stack.Screen name="(student)" />
-                <Stack.Screen name="(teacher)" /> 
+                <Stack.Screen name="(teacher)/(tabs)" /> 
+                {/* <Stack.Screen name="(student)/(tabs)" /> */}
+
                 
                 {/* Keep other protected screens accessible */}
                 <Stack.Screen name="editprofile" options={{ headerShown: false }} />

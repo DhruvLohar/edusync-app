@@ -58,13 +58,14 @@ const OTPForm = ({ onSubmit, loading }: OTPFormProps) => {
       <Text className="text-sm text-gray-500 text-center mb-8" style={{ fontFamily: 'Poppins_400Regular' }}>
         A 6-digit code has been sent to your email.
       </Text>
-      <InputField
+        <InputField
+        label='OTP'
         placeholder="0 0 0 0 0 0"
         keyboardType="number-pad"
         value={otp}
         onChangeText={setOtp}
         maxLength={6}
-        containerStyle="h-16 border border-gray-300 rounded-lg mx-5 mb-5 text-center text-2xl tracking-[10px]"
+        className="h-16 border border-gray-300 rounded-lg mx-5 mb-5 text-center text-2xl tracking-[10px]"
       />
       <Button
         title="Verify OTP"
@@ -116,7 +117,7 @@ export const LoginScreen = () => {
       Alert.alert('Success! 🎉', `OTP ${otp} verified.`);
       // FIXED: Navigate to the tabs root or specific tab
       // Option 1: Navigate to tabs root (will show the initial route - index)
-      router.replace('/private/(tabs)');
+      router.replace('/private/(teacher)/(tabs)');
       
       // Option 2: Navigate to a specific tab
       // router.replace('/(tabs)/analytics');
@@ -161,6 +162,7 @@ export const LoginScreen = () => {
               name="email"
               render={({ field: { onChange, onBlur, value } }) => (
                 <InputField
+                label='Email Address'
                   placeholder="Enter Email Address"
                   onBlur={() => {
                     onBlur();
@@ -171,7 +173,7 @@ export const LoginScreen = () => {
                   error={errors.email?.message}
                   keyboardType="email-address"
                   onFocus={() => setIsEmailFocused(true)}
-                  containerStyle={`border ${
+                  className={`border ${
                     isEmailFocused ? 'border-[#1E90FF]' : 'border-gray-300'
                   } rounded-lg px-0 bg-white h-12`}
                   style={{ paddingHorizontal: 15, fontSize: 16, color: '#333' }}

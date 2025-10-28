@@ -172,22 +172,3 @@ export async function loadEmbedding(userId: string): Promise<number[] | null> {
   }
 }
 
-export const loadRegisteredUser = async () => {
-    try {
-      // Get the single registered user from AsyncStorage
-      const allKeys = await AsyncStorage.getAllKeys();
-      const embeddingKey = allKeys.find(key => key.startsWith('@face_embedding:'));
-      
-      if (embeddingKey) {
-        const userId = embeddingKey.replace('@face_embedding:', '');
-        setRegisteredUser(userId);
-        console.log(`📋 Registered user found: ${userId}`);
-      } else {
-        console.log('📋 No registered user found');
-        setRegisteredUser(null);
-      }
-    } catch (error) {
-      console.error('💥 Error loading registered user:', error);
-    }
-  };
-

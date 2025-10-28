@@ -182,7 +182,7 @@ export default function StudentRegistrationScreen() {
 
   const handleBackToHome = () => {
     setShowSuccessModal(false);
-    router.replace('/private/(tabs)/analytics');
+    router.replace('/private/(student)/(tabs)')
   };
 
   const StepIndicator: React.FC<StepIndicatorProps> = ({ step, title, isActive }) => (
@@ -223,7 +223,6 @@ export default function StudentRegistrationScreen() {
           label="Full Name"
           value={fullName}
           onChangeText={setFullName}
-          containerStyle="h-14 border border-gray-300 rounded-xl px-4 bg-white"
         />
         <InputField
           placeholder="Enter Email Address"
@@ -231,7 +230,6 @@ export default function StudentRegistrationScreen() {
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
-          containerStyle="h-14 border border-gray-300 rounded-xl px-4 bg-white"
         />
         <InputField
           placeholder="Enter Phone Number"
@@ -239,7 +237,6 @@ export default function StudentRegistrationScreen() {
           value={phoneNumber}
           onChangeText={setPhoneNumber}
           keyboardType="phone-pad"
-          containerStyle="h-14 border border-gray-300 rounded-xl px-4 bg-white"
         />
       </View>
 
@@ -268,7 +265,6 @@ export default function StudentRegistrationScreen() {
           label="GR No."
           value={grNumber}
           onChangeText={setGrNumber}
-          containerStyle="h-14 border border-gray-300 rounded-xl px-4 bg-white"
         />
 
         <Text className="text-base text-black font-medium mb-2" style={{ fontFamily: 'Poppins_500Medium' }}>

@@ -29,9 +29,9 @@ export default function TabLayout() {
     >
       {/* Left Tab */}
       <Tabs.Screen
-        name="home"
+        name="index"
         options={{
-          title: "Home",
+          title: "index",
           tabBarIcon: ({ color, focused }) => (
             <View style={{ marginBottom: -40 }}>
               <TabBarIcon
@@ -72,7 +72,7 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Right Tab */}
+      Right Tab
       <Tabs.Screen
         name="profile"
         options={{

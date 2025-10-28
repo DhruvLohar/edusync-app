@@ -66,7 +66,7 @@ export default function TeacherRegistrationScreen() {
 
     const handleBackToHome = () => {
         setShowSuccessModal(false); 
-        router.replace('/(auth)'); 
+        router.replace('/private/(teacher)/(tabs)'); 
     };
 
     const StepIndicator: React.FC<StepIndicatorProps> = ({ step, title, isActive }) => (
