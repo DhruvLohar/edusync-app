@@ -117,7 +117,7 @@ const HomeScreen: React.FC = () => {
                 setTeacherName(res.data.name || 'Teacher');
                 let url = res.data.profile_photo;
                 if (url && url.startsWith('http://127.0.0.1:8000')) {
-                    url = url.replace('http://127.0.0.1:8000', 'http://192.168.29.121:8000');
+                    url = url.replace('http://127.0.0.1:8000', 'https://d7e21c34a21f.ngrok-free.app');
                 }
                 setProfilePhoto(url || null);
             }

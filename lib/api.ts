@@ -1,7 +1,7 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-export const API_URL = 'http://192.168.29.121:8000'
+export const API_URL = 'https://d7e21c34a21f.ngrok-free.app'
 
 axios.defaults.baseURL = API_URL;
 

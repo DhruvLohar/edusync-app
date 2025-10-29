@@ -401,7 +401,7 @@ const StudentHomeScreen: React.FC = () => {
   const getProfilePhotoUrl = (url?: string | null) => {
     if (!url) return undefined;
     if (url.startsWith('http://127.0.0.1:8000')) {
-      return url.replace('http://127.0.0.1:8000', 'http://192.168.29.121:8000');
+      return url.replace('http://127.0.0.1:8000', 'https://d7e21c34a21f.ngrok-free.app');
     }
     return url;
   };
