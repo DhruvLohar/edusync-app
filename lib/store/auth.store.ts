@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { fetchFromAPI, postToAPI } from '~/lib/api';
 import { getStorageItemAsync, setStorageItemAsync } from '~/lib/useStorageState';
 import { Alert } from 'react-native';
-import { User } from '~/type/user';
+import { User, UserType, Department, Year } from '~/type/user';
 
 interface APIResponse {
   success: boolean;
@@ -10,8 +10,40 @@ interface APIResponse {
   data: any;
 }
 
+/** Dummy student profile for development/demo */
+// export const DUMMY_STUDENT_PROFILE: User = {
+//   id: 1,
+//   name: 'Rahul Sharma',
+//   email: 'rahul.student@example.com',
+//   phone: '+91-9876543210',
+//   user_type: UserType.student,
+//   gr_no: 'CS2021001',
+//   department: Department.CSE,
+//   year: Year.BE,
+//   profile_photo: 'https://via.placeholder.com/150',
+//   is_active: true,
+//   onboarding_done: true,
+//   created_at: new Date(),
+//   updated_at: new Date(),
+// };
+
+/** Dummy teacher profile for development/demo */
+// export const DUMMY_TEACHER_PROFILE: User = {
+//   id: 2,
+//   name: 'Prof. Satish Ket',
+//   email: 'satish.teacher@example.com',
+//   phone: '+91-9876543211',
+//   user_type: UserType.teacher,
+//   employee_id: 'TCH001',
+//   profile_photo: 'https://via.placeholder.com/150',
+//   is_active: true,
+//   onboarding_done: true,
+//   created_at: new Date(),
+//   updated_at: new Date(),
+// };
+
 interface AuthState {
-  session: { access_token: string } | null;
+  session: { access_token: string; user_type?: string } | null;
   profile: User | null;
   isLoading: boolean;
   isSessionInitialized: boolean;
@@ -38,13 +70,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   async getOTP(uid: string) {
     return await postToAPI(`/users/get-email`, { uid });
+    // DUMMY DATA
+    // return { success: true, message: 'OTP sent successfully', data: {} };
   },
 
   async verifyOTP(email: string, otp: string) {
     const res: APIResponse = await postToAPI('/users/auth/verify-otp', { email, otp });
+    // DUMMY DATA – use teacher profile if email contains "teacher", otherwise student
+    const userType = email.toLowerCase().includes('teacher') ? 'teacher' : 'student';
+    // const res: APIResponse = {
+    //   success: true,
+    //   message: 'OTP verified',
+    //   data: {
+    //     access_token: 'dummy_access_token_12345',
+    //     onboarding_done: true,
+    //     user_type: userType,
+    //     user_id: userType === 'teacher' ? 2 : 1,
+    //   },
+    // };
 
     if (res.success) {
-      const sessionData = { access_token: res.data.access_token };
+      const sessionData = {
+        access_token: res.data.access_token,
+        user_type: res.data.user_type,
+      };
       set({ session: sessionData });
       await setStorageItemAsync(STORAGE_KEY, sessionData); // Save to SecureStore
       res.data.onboarding_done && (await get().refreshUser());
@@ -55,10 +104,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   async login(values: any) {
     return await postToAPI('/users/auth/login', values);
+    // DUMMY DATA – returns student by default; use user_type from values to switch
+    // const userType = values?.user_type ?? 'student';
+    // return {
+    //   success: true,
+    //   message: 'Login successful',
+    //   data: { access_token: 'dummy_access_token_12345', user_type: userType },
+    // };
   },
 
   async register(values: any) {
     return await postToAPI('/users/register', values);
+    // DUMMY DATA
+    // return { success: true, message: 'Registration successful', data: { user_id: 1 } };
   },
 
   async logOut() {
@@ -82,9 +140,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   async refreshUser() {
-       try {
+    try {
       const res = await fetchFromAPI('/users/profile');
-      set({ profile: res?.data });
+      // DUMMY DATA – use profile matching session.user_type
+      // const session = get().session;
+      // const userType = (session as any)?.user_type ?? 'student';
+      // const profile = userType === 'teacher' ? DUMMY_TEACHER_PROFILE : DUMMY_STUDENT_PROFILE;
+      // set({ profile });
+       set({ profile: res?.data });
     } catch (error) {
       console.error('[refreshUser error]', error);
     }
@@ -106,5 +169,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   async resendOTP(email: string) {
     return await postToAPI('/users/auth/resend-otp', { email });
+    // DUMMY DATA
+    // return { success: true, message: 'OTP resent successfully', data: {} };
   },
 }));

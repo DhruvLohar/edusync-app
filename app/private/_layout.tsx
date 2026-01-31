@@ -11,12 +11,9 @@ export default function ProtectedLayout() {
             {/* 🎯 FIX: REMOVE initialRouteName. Let the first declared Stack.Screen 
                handle the initial route, which is (student) in this case. */}
             <Stack screenOptions={{ headerShown: false }}>
-                
-                {/* The first Stack.Screen declared here becomes the initial screen. 
-                  Since we want the student page, we list it first.
-                */}
-                <Stack.Screen name="(teacher)/(tabs)" /> 
+                {/* Student first so /private and /private/(student)/(tabs) open student index */}
                 <Stack.Screen name="(student)/(tabs)" />
+                <Stack.Screen name="(teacher)/(tabs)" />
 
                 
                 {/* Keep other protected screens accessible */}

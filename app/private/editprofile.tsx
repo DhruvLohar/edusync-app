@@ -172,6 +172,10 @@ export default function EditProfileScreen() {
             }
 
             const res = await postToAPI("/users/update-profile", formData, true);
+            // DUMMY DATA (COMMENTED OUT)
+            /*
+            const res = { success: true, message: 'Profile updated successfully', data: {} };
+            */
 
             if (res.success) {
                 // Refresh user profile in store

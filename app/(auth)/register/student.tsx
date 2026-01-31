@@ -207,6 +207,20 @@ export default function StudentRegistrationScreen() {
         profile_photo: capturedImageUri,
       }); 
       const response = await postToAPI<RegistrationResponse>('/users/onboard', formData, true, true);
+      // DUMMY DATA (COMMENTED OUT)
+      /*
+      const response: RegistrationResponse = {
+        success: true,
+        message: 'Registration successful',
+        data: {
+          user_id: 1,
+          name: fullName,
+          email,
+          user_type: 'student',
+          onboarding_done: true
+        }
+      };
+      */
       console.log('Registration Response:', response);
       if (response && response.success) {
         await authStore.refreshUser();

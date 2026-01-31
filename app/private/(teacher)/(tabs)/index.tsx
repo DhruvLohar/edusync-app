@@ -112,7 +112,21 @@ const HomeScreen: React.FC = () => {
     useEffect(() => {
         // Fetch teacher profile for name and photo
         const fetchProfile = async () => {
-            const res = await fetchFromAPI<any>('/users/profile');
+           const res = await fetchFromAPI<any>('/users/profile');
+            // DUMMY DATA
+            // const res = {
+            //   success: true,
+            //   data: {
+            //     id: 1,
+            //     name: 'Dr. John Smith',
+            //     email: 'john.smith@example.com',
+            //     phone: '+91-9876543210',
+            //     user_type: 'teacher',
+            //     employee_id: 'EMP001',
+            //     department: 'Computer Science',
+            //     profile_photo: 'https://via.placeholder.com/150'
+            //   }
+            // };
             if (res && res.success && res.data) {
                 setTeacherName(res.data.name || 'Teacher');
                 let url = res.data.profile_photo;
@@ -128,7 +142,34 @@ const HomeScreen: React.FC = () => {
     useEffect(() => {
         // Fetch teacher attendance history
         const fetchHistory = async () => {
-            const res = await fetchFromAPI<any>('/teachers/history');
+           const res = await fetchFromAPI<any>('/teachers/history');
+            // DUMMY DATA
+            // const res = {
+            //   success: true,
+            //   data: [
+            //     {
+            //       id: 1,
+            //       class: { id: 1, name: 'Database Systems', code: 'CS301', semester: 7 },
+            //       start_time: '2025-01-28 10:00 AM',
+            //       end_time: '2025-01-28 11:00 AM',
+            //       summary: { total_students: 50, total_present: 48 }
+            //     },
+            //     {
+            //       id: 2,
+            //       class: { id: 2, name: 'Web Development', code: 'CS302', semester: 7 },
+            //       start_time: '2025-01-27 02:00 PM',
+            //       end_time: '2025-01-27 03:00 PM',
+            //       summary: { total_students: 45, total_present: 43 }
+            //     },
+            //     {
+            //       id: 3,
+            //       class: { id: 3, name: 'AI & ML', code: 'CS303', semester: 7 },
+            //       start_time: '2025-01-26 11:00 AM',
+            //       end_time: '2025-01-26 12:00 PM',
+            //       summary: { total_students: 40, total_present: 38 }
+            //     }
+            //   ]
+            // };
             if (res && res.success && Array.isArray(res.data)) {
                 // Map backend data to ClassAttendance[]
                 const mapped = res.data.map((attendance: any) => {

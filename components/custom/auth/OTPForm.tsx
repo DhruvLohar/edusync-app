@@ -7,7 +7,7 @@ import { Button } from "~/components/ui/Button";
 import { useState } from "react";
 
 const otpSchema = z.object({
-    otp: z.string().length(6, { message: 'OTP must be 5 digits' }),
+    otp: z.string().length(6, { message: 'OTP must be 6 digits' }),
 });
 export type OtpFormData = z.infer<typeof otpSchema>;
 

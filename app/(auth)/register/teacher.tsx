@@ -77,7 +77,19 @@ export default function TeacherRegistrationScreen() {
                 employee_id: employeeId,
             };
             console.log('Submitting Teacher Registration:', data);
-            const response = await postToAPI('/users/onboard', data, false, true);
+            // COMMENTED OUT: const response = await postToAPI('/users/onboard', data, false, true);
+            // DUMMY DATA
+            const response = {
+                success: true,
+                message: 'Registration successful',
+                data: {
+                    user_id: 1,
+                    name: fullName,
+                    email,
+                    user_type: 'teacher',
+                    onboarding_done: true
+                }
+            };
             console.log('Teacher Registration Response:', response);
             if (response && response.success) {
                 await authStore.refreshUser();

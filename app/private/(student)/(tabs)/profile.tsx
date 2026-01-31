@@ -23,6 +23,20 @@ const ProfileScreen: React.FC = () => {
         const fetchProfile = async () => {
             setLoading(true);
             const res = await fetchFromAPI<any>('/users/profile');
+            // DUMMY DATA
+    //         const res = {
+    //           success: true,
+    //           data: {
+    //             id: 1,
+    //             name: 'Nandani Kadave',
+    //             email: 'nandani@example.com',
+    //             phone: '+91-9876543210',
+    //             user_type: 'student',
+    //             gr_no: 'CS2021001',
+    //             profile_photo: 'https://via.placeholder.com/150',
+    //             onboarding_done: true
+    //           }
+    //         };
             if (res && res.success && res.data) {
                 setProfile(res.data);
             } else {
