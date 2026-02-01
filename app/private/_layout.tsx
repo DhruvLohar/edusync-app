@@ -10,7 +10,7 @@ export default function ProtectedLayout() {
         <GestureHandlerRootView style={{ flex: 1 }}>
             {/* 🎯 FIX: REMOVE initialRouteName. Let the first declared Stack.Screen 
                handle the initial route, which is (student) in this case. */}
-            <Stack screenOptions={{ headerShown: false }}>
+            <Stack screenOptions={{ headerShown: false }} initialRouteName="ble-teacher">
                 
                 {/* The first Stack.Screen declared here becomes the initial screen. 
                   Since we want the student page, we list it first.
@@ -21,6 +21,10 @@ export default function ProtectedLayout() {
                 
                 {/* Keep other protected screens accessible */}
                 <Stack.Screen name="editprofile" options={{ headerShown: false }} />
+
+                <Stack.Screen name="ble-student" />
+                <Stack.Screen name="ble-teacher" />
+                {/* <Stack.Screen name="editprofile" options={{ headerShown: false }} /> */}
             </Stack>
         </GestureHandlerRootView>
     );

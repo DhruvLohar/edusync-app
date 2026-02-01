@@ -1,19 +1,19 @@
 import { registerWebModule, NativeModule } from 'expo';
 
-import { ChangeEventPayload } from './ExpoBleCore.types';
+import { ExpoBleCoreModuleType } from './ExpoBleCore.types';
 
-type ExpoBleCoreModuleEvents = {
-  onChange: (params: ChangeEventPayload) => void;
+class ExpoBleCoreModule extends NativeModule implements ExpoBleCoreModuleType {
+  hello() {
+    return 'Hello world!';
+  }
+
+  startAdvertising() {
+    return 'BLE advertising is not supported on web';
+  }
+
+  stopAdvertising() {
+    return 'BLE advertising is not supported on web';
+  }
 }
 
-class ExpoBleCoreModule extends NativeModule<ExpoBleCoreModuleEvents> {
-  PI = Math.PI;
-  async setValueAsync(value: string): Promise<void> {
-    this.emit('onChange', { value });
-  }
-  hello() {
-    return 'Hello world! 👋';
-  }
-};
-
-export default registerWebModule(ExpoBleCoreModule, 'ExpoBleCoreModule');
+export default registerWebModule(ExpoBleCoreModule, 'ExpoBleCore');
