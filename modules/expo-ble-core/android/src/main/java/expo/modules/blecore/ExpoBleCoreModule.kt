@@ -24,9 +24,6 @@ import java.util.UUID
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-import com.facebook.react.modules.core.PermissionAwareActivity
-import com.facebook.react.modules.core.PermissionListener
-
 class ExpoBleCoreModule : Module() {
 
   // ============== CONSTANTS ==============
@@ -143,11 +140,13 @@ class ExpoBleCoreModule : Module() {
         return@AsyncFunction
       }
 
+      // Check if we already have all permissions
       if (hasRequiredPermissions(activity)) {
         promise.resolve(true)
         return@AsyncFunction
       }
 
+      // Get required permissions based on API level
       val permissionsToRequest = getRequiredPermissions(activity)
       
       if (permissionsToRequest.isEmpty()) {
@@ -155,36 +154,19 @@ class ExpoBleCoreModule : Module() {
         return@AsyncFunction
       }
 
+      // Request permissions using ActivityCompat directly
       try {
-        val permissionAwareActivity = activity as? PermissionAwareActivity
-        if (permissionAwareActivity != null) {
-          permissionAwareActivity.requestPermissions(
-            permissionsToRequest.toTypedArray(),
-            PERMISSION_REQUEST_CODE,
-            object : PermissionListener {
-              override fun onRequestPermissionsResult(
-                requestCode: Int,
-                permissions: Array<out String>,
-                grantResults: IntArray
-              ): Boolean {
-                if (requestCode == PERMISSION_REQUEST_CODE) {
-                  val allGranted = grantResults.isNotEmpty() && 
-                    grantResults.all { it == PackageManager.PERMISSION_GRANTED }
-                  promise.resolve(allGranted)
-                  return true
-                }
-                return false
-              }
-            }
-          )
-        } else {
-          ActivityCompat.requestPermissions(
-            activity,
-            permissionsToRequest.toTypedArray(),
-            PERMISSION_REQUEST_CODE
-          )
-          promise.resolve(false)
-        }
+        ActivityCompat.requestPermissions(
+          activity,
+          permissionsToRequest.toTypedArray(),
+          PERMISSION_REQUEST_CODE
+        )
+        
+        // For Expo modules, handle permission result in JS side
+        // Or wait and check again after a delay
+        Handler(Looper.getMainLooper()).postDelayed({
+          promise.resolve(hasRequiredPermissions(activity))
+        }, 1000)
       } catch (e: Exception) {
         promise.reject("PERMISSION_ERROR", e.message, e)
       }
