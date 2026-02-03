@@ -33,7 +33,7 @@ export default function RootLayout() {
   });
 
   // Toggle this for testing - set to true to test logged-in state
-  const isLoggedIn = !!(session && profile); // Change to: !!(session && profile) for production
+  const isLoggedIn = true; // Change to: !!(session && profile) for production
 
   async function checkSession() {
     await rehydrateSession();
