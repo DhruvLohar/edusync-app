@@ -17,6 +17,11 @@ import ExpoBleCore, {
 import { onAlertProgress, onBluetoothStateChanged, onStudentDiscovered } from "~/modules/expo-ble-core/src/ExpoBleCoreModule";
 
 import type { EventSubscription } from 'expo-modules-core';
+<<<<<<< HEAD
+=======
+// REMOVE THIS IMPORT
+// import { generateShortClassId } from "~/lib/bleHash"; 
+>>>>>>> f918ffb (data too large issue resolution)
 
 interface Student {
     studentId: number;
@@ -48,7 +53,14 @@ function BleTeacherView() {
     const debugHeight = useRef(new Animated.Value(0)).current;
     const subscriptions = useRef<EventSubscription[]>([]);
 
+<<<<<<< HEAD
     const classId = "CLASS_A_BE"; // Replace with dynamic class ID
+=======
+    // === CRITICAL FIX ===
+    // Use the Raw ID. Do NOT hash it.
+    const classId = "CSE_BE_SECTION_A"; 
+    // ====================
+>>>>>>> f918ffb (data too large issue resolution)
 
     const addDebugLog = useCallback((message: string, type: DebugLog['type'] = 'info') => {
         setDebugLogs(prev => [
@@ -77,6 +89,18 @@ function BleTeacherView() {
                 return;
             }
 
+<<<<<<< HEAD
+=======
+            subscriptions.current = [studentSub, progressSub, bluetoothSub];
+
+            // Logic to verify class ID matches is handled in Native, 
+            // but we can double check here
+            if (event.classId !== classId) {
+                 // Ignore stray packets if any leak through
+                 return;
+            }
+
+>>>>>>> f918ffb (data too large issue resolution)
             addDebugLog(
                 `Discovered: ID ${event.studentId}, RSSI ${event.rssi}dBm`,
                 'success'
@@ -84,7 +108,14 @@ function BleTeacherView() {
 
             setStudents(prev => {
                 const exists = prev.find(s => s.studentId === event.studentId);
+<<<<<<< HEAD
                 if (exists) return prev;
+=======
+                if (exists) {
+                    // Update RSSI if needed, but don't duplicate
+                    return prev;
+                }
+>>>>>>> f918ffb (data too large issue resolution)
 
                 return [...prev, {
                     studentId: event.studentId,
@@ -93,7 +124,11 @@ function BleTeacherView() {
                     discoveredAt: Date.now(),
                     verified: false,
                     verifiedAt: null,
+<<<<<<< HEAD
                     name: `Student ${event.studentId}` // Replace with DB lookup
+=======
+                    name: `Student ${event.studentId}` 
+>>>>>>> f918ffb (data too large issue resolution)
                 }];
             });
         });
@@ -227,6 +262,7 @@ function BleTeacherView() {
     }, [students, addDebugLog]);
 
     const getAttendanceReport = useCallback(() => {
+<<<<<<< HEAD
         const report = ExpoBleCore.getAttendanceReport();
         const present = report.filter(s => s.status === 'present').length;
         const unverified = report.filter(s => s.status === 'unverified').length;
@@ -234,6 +270,17 @@ function BleTeacherView() {
         Alert.alert(
             'Attendance Report',
             `Present: ${present}\nUnverified: ${unverified}\nTotal: ${report.length}`
+=======
+        const report = ExpoBleCore.getDiscoveredStudents(); // FIXED: Function name
+        // const present = report.filter(s => s.status === 'present').length;
+        // Simple logic for report
+        const total = report.length;
+        const verified = report.filter(s => s.verified).length;
+
+        Alert.alert(
+            'Attendance Report',
+            `Verified: ${verified}\nTotal Found: ${total}`
+>>>>>>> f918ffb (data too large issue resolution)
         );
     }, []);
 
@@ -254,13 +301,24 @@ function BleTeacherView() {
             <StatusBar barStyle="dark-content" />
 
             {/* Header */}
+<<<<<<< HEAD
             <View className="px-6 pt-4 pb-3 bg-white border-b border-gray-200">
+=======
+            <View className="px-6 pt-3 pb-3 bg-white border-b border-gray-200">
+>>>>>>> f918ffb (data too large issue resolution)
                 <View className="flex-row items-center justify-between">
                     <View>
                         <Text className="text-2xl font-bold text-gray-900">Roll Call</Text>
                         <Text className="text-sm text-gray-500 mt-0.5">{classId}</Text>
                     </View>
                     <View className="flex-row items-center gap-2">
+<<<<<<< HEAD
+=======
+                        {/* NOTE: For testing, you usually cannot scan and advertise on the 
+                          SAME device at the same time efficiently. 
+                          You need two phones to test this properly. 
+                        */}
+>>>>>>> f918ffb (data too large issue resolution)
                         <Pressable
                             onPress={() => router.push("/private/ble-student")}
                             className="bg-teal-100 px-3 py-2 rounded-lg"
@@ -277,7 +335,10 @@ function BleTeacherView() {
                     </View>
                 </View>
 
+<<<<<<< HEAD
                 {/* Bluetooth Status Warning */}
+=======
+>>>>>>> f918ffb (data too large issue resolution)
                 {!bluetoothEnabled && (
                     <View className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3">
                         <Text className="text-red-700 text-sm font-medium">
@@ -439,4 +500,8 @@ function BleTeacherView() {
     );
 }
 
+<<<<<<< HEAD
 export default BleTeacherView;
+=======
+export default BleTeacherView;
+>>>>>>> f918ffb (data too large issue resolution)

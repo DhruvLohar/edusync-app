@@ -28,6 +28,7 @@ class ExpoBleCoreModule : Module() {
 
   // ============== CONSTANTS ==============
   companion object {
+    private const val TAG = "ExpoBleCore"
     private const val PERMISSION_REQUEST_CODE = 1001
     
     // Service & Characteristic UUIDs
@@ -44,7 +45,6 @@ class ExpoBleCoreModule : Module() {
     
     // Timeouts
     private const val CONNECTION_TIMEOUT_MS = 10000L
-    private const val DEFAULT_ALERT_DELAY_MS = 2000L
   }
 
   // ============== STATE VARIABLES ==============
@@ -103,16 +103,19 @@ class ExpoBleCoreModule : Module() {
 
     // Initialize bluetooth manager
     OnCreate {
+      android.util.Log.d(TAG, "Initializing Module...")
       val activity = appContext.activityProvider?.currentActivity
       activity?.let {
         bluetoothManager = it.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
         bluetoothAdapter = bluetoothManager?.adapter
         alertHandler = Handler(Looper.getMainLooper())
+        android.util.Log.d(TAG, "Bluetooth Adapter initialized: ${bluetoothAdapter != null}")
       }
     }
 
     // Cleanup on destroy
     OnDestroy {
+      android.util.Log.d(TAG, "Destroying Module & Cleaning up")
       cleanup()
     }
 
@@ -128,12 +131,12 @@ class ExpoBleCoreModule : Module() {
     // ============== CORE FUNCTIONS ==============
 
     Function("hasPermissions") {
-      val activity = appContext.activityProvider?.currentActivity
-        ?: return@Function false
+      val activity = appContext.activityProvider?.currentActivity ?: return@Function false
       return@Function hasRequiredPermissions(activity)
     }
 
     AsyncFunction("requestPermissions") { promise: Promise ->
+      android.util.Log.d(TAG, "requestPermissions called")
       val activity = appContext.activityProvider?.currentActivity
       if (activity == null) {
         promise.resolve(false)
@@ -142,12 +145,14 @@ class ExpoBleCoreModule : Module() {
 
       // Check if we already have all permissions
       if (hasRequiredPermissions(activity)) {
+        android.util.Log.d(TAG, "Permissions already granted")
         promise.resolve(true)
         return@AsyncFunction
       }
 
       // Get required permissions based on API level
       val permissionsToRequest = getRequiredPermissions(activity)
+      android.util.Log.d(TAG, "Requesting permissions: $permissionsToRequest")
       
       if (permissionsToRequest.isEmpty()) {
         promise.resolve(true)
@@ -162,12 +167,13 @@ class ExpoBleCoreModule : Module() {
           PERMISSION_REQUEST_CODE
         )
         
-        // For Expo modules, handle permission result in JS side
-        // Or wait and check again after a delay
         Handler(Looper.getMainLooper()).postDelayed({
-          promise.resolve(hasRequiredPermissions(activity))
+          val granted = hasRequiredPermissions(activity)
+          android.util.Log.d(TAG, "Permissions result after delay: $granted")
+          promise.resolve(granted)
         }, 1000)
       } catch (e: Exception) {
+        android.util.Log.e(TAG, "Permission request failed", e)
         promise.reject("PERMISSION_ERROR", e.message, e)
       }
     }
@@ -191,8 +197,6 @@ class ExpoBleCoreModule : Module() {
       try {
         val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
         activity.startActivityForResult(enableBtIntent, 1002)
-        // Note: In production, you'd want to handle the activity result
-        // For now, we resolve after a delay to check status
         Handler(Looper.getMainLooper()).postDelayed({
           promise.resolve(bluetoothAdapter?.isEnabled == true)
         }, 1000)
@@ -202,7 +206,9 @@ class ExpoBleCoreModule : Module() {
     }
 
     Function("isBleAdvertisingSupported") {
-      return@Function bluetoothAdapter?.isMultipleAdvertisementSupported == true
+      val supported = bluetoothAdapter?.isMultipleAdvertisementSupported == true
+      android.util.Log.d(TAG, "isBleAdvertisingSupported: $supported")
+      return@Function supported
     }
 
     Function("startBluetoothStateListener") {
@@ -218,6 +224,7 @@ class ExpoBleCoreModule : Module() {
           if (intent?.action == BluetoothAdapter.ACTION_STATE_CHANGED) {
             val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
             val enabled = state == BluetoothAdapter.STATE_ON
+            android.util.Log.d(TAG, "Bluetooth State Changed: $enabled")
             sendEvent("onBluetoothStateChanged", bundleOf("enabled" to enabled))
           }
         }
@@ -246,6 +253,7 @@ class ExpoBleCoreModule : Module() {
     // ============== TEACHER FUNCTIONS (BleBeacon) ==============
 
     AsyncFunction("startStudentScan") { classId: String, promise: Promise ->
+      android.util.Log.d(TAG, "startStudentScan called for Class: $classId")
       val activity = appContext.activityProvider?.currentActivity
       if (activity == null) {
         promise.resolve(mapOf("success" to false, "error" to "No activity"))
@@ -253,22 +261,26 @@ class ExpoBleCoreModule : Module() {
       }
 
       if (!hasRequiredPermissions(activity)) {
+        android.util.Log.e(TAG, "Scan failed: Missing permissions")
         promise.resolve(mapOf("success" to false, "error" to "Missing permissions"))
         return@AsyncFunction
       }
 
       if (bluetoothAdapter?.isEnabled != true) {
+        android.util.Log.e(TAG, "Scan failed: Bluetooth off")
         promise.resolve(mapOf("success" to false, "error" to "Bluetooth not enabled"))
         return@AsyncFunction
       }
 
       if (isScanning) {
+        android.util.Log.w(TAG, "Already scanning")
         promise.resolve(mapOf("success" to false, "error" to "Already scanning"))
         return@AsyncFunction
       }
 
       bluetoothLeScanner = bluetoothAdapter?.bluetoothLeScanner
       if (bluetoothLeScanner == null) {
+        android.util.Log.e(TAG, "Scanner is null")
         promise.resolve(mapOf("success" to false, "error" to "Scanner not available"))
         return@AsyncFunction
       }
@@ -285,6 +297,7 @@ class ExpoBleCoreModule : Module() {
         }
 
         override fun onScanFailed(errorCode: Int) {
+          android.util.Log.e(TAG, "Scan Failed with error code: $errorCode")
           isScanning = false
           sendEvent("onStudentDiscovered", mapOf(
             "error" to true,
@@ -301,15 +314,19 @@ class ExpoBleCoreModule : Module() {
       try {
         bluetoothLeScanner?.startScan(null, scanSettings, scanCallback)
         isScanning = true
+        android.util.Log.i(TAG, "Scanning started successfully")
         promise.resolve(mapOf("success" to true))
       } catch (e: SecurityException) {
+        android.util.Log.e(TAG, "SecurityException in startScan", e)
         promise.resolve(mapOf("success" to false, "error" to "Security exception: ${e.message}"))
       } catch (e: Exception) {
+        android.util.Log.e(TAG, "Exception in startScan", e)
         promise.resolve(mapOf("success" to false, "error" to e.message))
       }
     }
 
     Function("stopStudentScan") {
+      android.util.Log.d(TAG, "stopStudentScan called")
       if (!isScanning || scanCallback == null) {
         return@Function mapOf("success" to false, "error" to "Not scanning")
       }
@@ -323,6 +340,7 @@ class ExpoBleCoreModule : Module() {
       isScanning = false
       scanCallback = null
       scanClassId = null
+      android.util.Log.i(TAG, "Scanning stopped")
       return@Function mapOf("success" to true)
     }
 
@@ -350,14 +368,10 @@ class ExpoBleCoreModule : Module() {
     }
 
     AsyncFunction("sendAlertToStudent") { deviceAddress: String, alertType: Int, promise: Promise ->
+      android.util.Log.d(TAG, "sendAlertToStudent: $deviceAddress")
       val activity = appContext.activityProvider?.currentActivity
       if (activity == null) {
         promise.resolve(mapOf("success" to false, "error" to "No activity"))
-        return@AsyncFunction
-      }
-
-      if (bluetoothAdapter?.isEnabled != true) {
-        promise.resolve(mapOf("success" to false, "error" to "Bluetooth not enabled"))
         return@AsyncFunction
       }
 
@@ -377,13 +391,12 @@ class ExpoBleCoreModule : Module() {
 
       // Set connection timeout
       connectionTimeoutRunnable = Runnable {
+        android.util.Log.w(TAG, "Connection timeout for $deviceAddress")
         currentGatt?.let {
           try {
             it.disconnect()
             it.close()
-          } catch (e: SecurityException) {
-            // Ignore
-          }
+          } catch (e: SecurityException) {}
         }
         currentGatt = null
         gattConnectionPromise?.resolve(mapOf("success" to false, "error" to "Connection timeout"))
@@ -393,6 +406,7 @@ class ExpoBleCoreModule : Module() {
 
       val gattCallback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
+          android.util.Log.d(TAG, "GATT State Change: Status=$status, NewState=$newState")
           when (newState) {
             BluetoothProfile.STATE_CONNECTED -> {
               try {
@@ -408,6 +422,7 @@ class ExpoBleCoreModule : Module() {
         }
 
         override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
+          android.util.Log.d(TAG, "Services Discovered: Status=$status")
           if (status != BluetoothGatt.GATT_SUCCESS) {
             handleGattError("Service discovery failed")
             return
@@ -426,10 +441,11 @@ class ExpoBleCoreModule : Module() {
           }
 
           try {
-            characteristic.value = byteArrayOf(alertType.toByte())
+            android.util.Log.d(TAG, "Writing Alert Type: $alertType")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
               gatt.writeCharacteristic(characteristic, byteArrayOf(alertType.toByte()), BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
             } else {
+              characteristic.value = byteArrayOf(alertType.toByte())
               characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
               gatt.writeCharacteristic(characteristic)
             }
@@ -443,15 +459,14 @@ class ExpoBleCoreModule : Module() {
           characteristic: BluetoothGattCharacteristic?,
           status: Int
         ) {
+          android.util.Log.d(TAG, "Characteristic Write: Status=$status")
           connectionTimeoutRunnable?.let { alertHandler?.removeCallbacks(it) }
           
           if (status == BluetoothGatt.GATT_SUCCESS) {
-            // Mark student as verified
             discoveredStudents.values.find { it.deviceAddress == deviceAddress }?.let {
               it.verified = true
               it.verifiedAt = System.currentTimeMillis()
             }
-            
             gattConnectionPromise?.resolve(mapOf("success" to true))
           } else {
             gattConnectionPromise?.resolve(mapOf("success" to false, "error" to "Write failed with status $status"))
@@ -462,31 +477,26 @@ class ExpoBleCoreModule : Module() {
           try {
             gatt?.disconnect()
             gatt?.close()
-          } catch (e: SecurityException) {
-            // Ignore
-          }
+          } catch (e: SecurityException) {}
           currentGatt = null
         }
 
         private fun handleGattError(error: String) {
+          android.util.Log.e(TAG, "GATT Error: $error")
           connectionTimeoutRunnable?.let { alertHandler?.removeCallbacks(it) }
           gattConnectionPromise?.resolve(mapOf("success" to false, "error" to error))
           gattConnectionPromise = null
           try {
             currentGatt?.disconnect()
             currentGatt?.close()
-          } catch (e: SecurityException) {
-            // Ignore
-          }
+          } catch (e: SecurityException) {}
           currentGatt = null
         }
 
         private fun cleanupGattConnection() {
           try {
             currentGatt?.close()
-          } catch (e: SecurityException) {
-            // Ignore
-          }
+          } catch (e: SecurityException) {}
           currentGatt = null
         }
       }
@@ -501,6 +511,7 @@ class ExpoBleCoreModule : Module() {
     }
 
     AsyncFunction("sendAlertToAll") { studentAddresses: List<String>, alertType: Int, delayMs: Int, promise: Promise ->
+      android.util.Log.d(TAG, "sendAlertToAll: ${studentAddresses.size} students")
       if (isAlertRolloutActive) {
         promise.resolve(mapOf("success" to false, "error" to "Alert rollout already in progress"))
         return@AsyncFunction
@@ -517,6 +528,7 @@ class ExpoBleCoreModule : Module() {
       Thread {
         for ((index, address) in studentAddresses.withIndex()) {
           if (alertRolloutCancelled) {
+            android.util.Log.d(TAG, "Alert Rollout Cancelled")
             break
           }
 
@@ -549,11 +561,7 @@ class ExpoBleCoreModule : Module() {
             alertError = "Timeout"
           }
 
-          if (alertSuccess) {
-            successCount++
-          } else {
-            failedCount++
-          }
+          if (alertSuccess) successCount++ else failedCount++
 
           results.add(mapOf(
             "deviceAddress" to address,
@@ -578,6 +586,7 @@ class ExpoBleCoreModule : Module() {
         }
 
         isAlertRolloutActive = false
+        android.util.Log.i(TAG, "Alert Rollout Finished. Success: $successCount, Failed: $failedCount")
 
         Handler(Looper.getMainLooper()).post {
           promise.resolve(mapOf(
@@ -630,19 +639,11 @@ class ExpoBleCoreModule : Module() {
     // ============== STUDENT FUNCTIONS (BleAttendee) ==============
 
     AsyncFunction("checkIn") { classId: String, studentId: Int, promise: Promise ->
+      android.util.Log.d("ExpoBleCore", "➡️ checkIn called: classId='$classId', studentId=$studentId")
+
       val activity = appContext.activityProvider?.currentActivity
-      if (activity == null) {
-        promise.resolve(mapOf("success" to false, "error" to "No activity"))
-        return@AsyncFunction
-      }
-
-      if (!hasRequiredPermissions(activity)) {
-        promise.resolve(mapOf("success" to false, "error" to "Missing permissions"))
-        return@AsyncFunction
-      }
-
-      if (bluetoothAdapter?.isEnabled != true) {
-        promise.resolve(mapOf("success" to false, "error" to "Bluetooth not enabled"))
+      if (activity == null || !hasRequiredPermissions(activity) || bluetoothAdapter?.isEnabled != true) {
+        promise.resolve(mapOf("success" to false, "error" to "Setup failed"))
         return@AsyncFunction
       }
 
@@ -657,35 +658,48 @@ class ExpoBleCoreModule : Module() {
         return@AsyncFunction
       }
 
-      // Setup GATT server first
-      val gattServerSetup = setupGattServer(activity)
-      if (!gattServerSetup) {
-        promise.resolve(mapOf("success" to false, "error" to "Failed to setup GATT server"))
+      // Setup GATT Server
+      if (!setupGattServer(activity)) {
+        promise.resolve(mapOf("success" to false, "error" to "GATT Server failed"))
         return@AsyncFunction
       }
 
-      // Build manufacturer data: [classId bytes (up to 10)] + [studentId 4 bytes]
-      val classIdBytes = classId.toByteArray(Charsets.UTF_8).take(10).toByteArray()
+      // ============================================================
+      // NEW STRATEGY: Service UUID in Main Packet, Data in Response
+      // ============================================================
+      
+      // 1. Prepare Payload (Data)
+      val classIdBytes = classId.toByteArray(Charsets.UTF_8)
       val studentIdBytes = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(studentId).array()
-      val manufacturerData = classIdBytes + "_".toByteArray() + studentIdBytes
+      val payload = classIdBytes + "_".toByteArray() + studentIdBytes
+      
+      android.util.Log.d("ExpoBleCore", "📦 Payload: ${payload.size} bytes (${classId}_$studentId)")
+
+      // 2. Main Packet (The "Announcement")
+      // We put the Service UUID here so iOS sees it immediately.
+      val serviceUUID = ParcelUuid.fromString(ATTENDANCE_SERVICE_UUID)
+      val advertiseData = AdvertiseData.Builder()
+        .addServiceUuid(serviceUUID) 
+        .setIncludeDeviceName(false)
+        .setIncludeTxPowerLevel(true) // Helps iOS calculate distance
+        .build()
+
+      // 3. Scan Response (The "Details")
+      // We put the Manufacturer Data here. iOS will request this automatically.
+      val scanResponse = AdvertiseData.Builder()
+        .addManufacturerData(MANUFACTURER_ID, payload)
+        .build()
 
       val settings = AdvertiseSettings.Builder()
         .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
         .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
         .setConnectable(true)
-        .setTimeout(0) // Advertise indefinitely
-        .build()
-
-      val serviceUUID = ParcelUuid.fromString(ATTENDANCE_SERVICE_UUID)
-      val data = AdvertiseData.Builder()
-        .addServiceUuid(serviceUUID)
-        .addManufacturerData(MANUFACTURER_ID, manufacturerData)
-        .setIncludeDeviceName(false)
+        .setTimeout(0)
         .build()
 
       advertiseCallback = object : AdvertiseCallback() {
         override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
-          super.onStartSuccess(settingsInEffect)
+          android.util.Log.i("ExpoBleCore", "✅ Advertising Started! (UUID in Main, Data in Resp)")
           isAdvertising = true
           currentClassId = classId
           currentStudentId = studentId
@@ -694,29 +708,23 @@ class ExpoBleCoreModule : Module() {
         }
 
         override fun onStartFailure(errorCode: Int) {
-          super.onStartFailure(errorCode)
-          val errorMsg = when (errorCode) {
-            ADVERTISE_FAILED_DATA_TOO_LARGE -> "Data too large"
-            ADVERTISE_FAILED_TOO_MANY_ADVERTISERS -> "Too many advertisers"
-            ADVERTISE_FAILED_ALREADY_STARTED -> "Already started"
-            ADVERTISE_FAILED_INTERNAL_ERROR -> "Internal error"
-            ADVERTISE_FAILED_FEATURE_UNSUPPORTED -> "Feature unsupported"
-            else -> "Unknown error: $errorCode"
-          }
+          android.util.Log.e("ExpoBleCore", "❌ Advertising Failed: $errorCode")
           stopGattServer()
-          promise.resolve(mapOf("success" to false, "error" to errorMsg))
+          promise.resolve(mapOf("success" to false, "error" to "Start failure: $errorCode"))
         }
       }
 
       try {
-        bluetoothLeAdvertiser?.startAdvertising(settings, data, advertiseCallback)
-      } catch (e: SecurityException) {
+        bluetoothLeAdvertiser?.startAdvertising(settings, advertiseData, scanResponse, advertiseCallback)
+      } catch (e: Exception) {
+        android.util.Log.e("ExpoBleCore", "❌ Exception: ${e.message}")
         stopGattServer()
-        promise.resolve(mapOf("success" to false, "error" to "Security exception: ${e.message}"))
+        promise.resolve(mapOf("success" to false, "error" to e.message))
       }
     }
 
     Function("checkOut") {
+      android.util.Log.d(TAG, "checkOut called")
       if (!isAdvertising) {
         return@Function mapOf("success" to false, "error" to "Not checked in")
       }
@@ -736,7 +744,7 @@ class ExpoBleCoreModule : Module() {
       currentStudentId = null
       checkInTimestamp = null
       advertiseCallback = null
-
+      android.util.Log.i(TAG, "Checked out successfully")
       return@Function mapOf("success" to true)
     }
 
@@ -792,50 +800,89 @@ class ExpoBleCoreModule : Module() {
 
   private fun processScanResult(result: ScanResult) {
     val scanRecord = result.scanRecord ?: return
-    val manufacturerData = scanRecord.getManufacturerSpecificData(MANUFACTURER_ID) ?: return
+    val device = result.device
+    val rssi = result.rssi
+    
+    // DEBUG: Uncomment if you want to see EVERY raw BLE packet (very noisy)
+    // android.util.Log.v(TAG, "Raw Packet: ${device.address}")
 
-    // Parse manufacturer data: [classId]_[studentId]
-    val dataString = String(manufacturerData, Charsets.UTF_8)
-    val parts = dataString.split("_")
-    
-    if (parts.size < 2) return
-    
-    val scannedClassId = parts[0]
-    
-    // Filter by class ID
-    if (scanClassId != null && scannedClassId != scanClassId) return
-    
-    // Extract student ID from remaining bytes
-    val studentIdBytes = manufacturerData.takeLast(4).toByteArray()
-    val studentId = ByteBuffer.wrap(studentIdBytes).order(ByteOrder.LITTLE_ENDIAN).int
-    
-    val deviceAddress = result.device.address
+    var foundClassId: String? = null
+    var foundStudentId: Int? = null
 
-    // De-duplicate
-    if (discoveredStudents.containsKey(studentId)) {
-      return
+    // =========================================================
+    // 1. Try Manufacturer Data (Android Student Format)
+    // =========================================================
+    scanRecord.getManufacturerSpecificData(MANUFACTURER_ID)?.let { bytes ->
+       // FIX: Do NOT convert the whole thing to String. 
+       // Find the separator byte (0x5F is '_')
+       val separatorIndex = bytes.indexOf(0x5F.toByte())
+       
+       if (separatorIndex != -1) {
+           try {
+               // A. Decode Class ID (Bytes BEFORE separator)
+               val classIdBytes = bytes.copyOfRange(0, separatorIndex)
+               foundClassId = String(classIdBytes, Charsets.UTF_8)
+               
+               // B. Decode Student ID (Bytes AFTER separator)
+               val startOfInt = separatorIndex + 1
+               // We need at least 4 bytes for the Int
+               if (bytes.size >= startOfInt + 4) {
+                   val studentIdBytes = bytes.copyOfRange(startOfInt, startOfInt + 4)
+                   foundStudentId = ByteBuffer.wrap(studentIdBytes).order(ByteOrder.LITTLE_ENDIAN).int
+               }
+               
+               android.util.Log.d(TAG, "⚡ Parsed Manuf Packet: '$foundClassId', ID: $foundStudentId")
+           } catch (e: Exception) {
+               android.util.Log.e(TAG, "⚠️ Parse Error: ${e.message}")
+           }
+       }
     }
 
-    val studentInfo = StudentInfo(
-      studentId = studentId,
-      deviceAddress = deviceAddress,
-      rssi = result.rssi,
-      discoveredAt = System.currentTimeMillis()
-    )
+    // =========================================================
+    // 2. Try Local Name (iOS Student Format)
+    // =========================================================
+    if (foundClassId == null) {
+       scanRecord.deviceName?.let { name ->
+          val parts = name.split("_")
+          if (parts.size >= 2) {
+             foundClassId = parts[0]
+             foundStudentId = parts[1].toIntOrNull()
+             // android.util.Log.d(TAG, "⚡ Parsed Name Packet: '$foundClassId', ID: $foundStudentId")
+          }
+       }
+    }
 
-    discoveredStudents[studentId] = studentInfo
-    discoveredDeviceAddresses.add(deviceAddress)
+    // =========================================================
+    // 3. Validation & Reporting
+    // =========================================================
+    if (foundClassId != null && foundStudentId != null) {
+       // Log if we found a class, even if it's the wrong one (Helps debugging)
+       if (scanClassId != null && foundClassId != scanClassId) {
+           // android.util.Log.d(TAG, "Ignored: Class '$foundClassId' != '$scanClassId'")
+           return
+       }
+       
+       // Don't spam duplicate events
+       if (discoveredStudents.containsKey(foundStudentId)) {
+           return
+       }
+       
+       android.util.Log.i(TAG, "✅ MATCH FOUND! Class: $foundClassId, Student: $foundStudentId")
 
-    // Emit event
-    sendEvent("onStudentDiscovered", bundleOf(
-      "studentId" to studentId,
-      "deviceAddress" to deviceAddress,
-      "rssi" to result.rssi,
-      "classId" to scannedClassId
-    ))
+       val info = StudentInfo(foundStudentId!!, device.address, rssi, System.currentTimeMillis())
+       discoveredStudents[foundStudentId!!] = info
+       
+       sendEvent("onStudentDiscovered", bundleOf(
+         "studentId" to foundStudentId, 
+         "deviceAddress" to device.address, 
+         "rssi" to rssi, 
+         "classId" to foundClassId
+       ))
+    }
   }
 
   private fun setupGattServer(context: Context): Boolean {
+    android.util.Log.d(TAG, "setupGattServer called")
     if (bluetoothManager == null) {
       bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
     }
@@ -843,6 +890,7 @@ class ExpoBleCoreModule : Module() {
     val gattCallback = object : BluetoothGattServerCallback() {
       override fun onConnectionStateChange(device: BluetoothDevice?, status: Int, newState: Int) {
         super.onConnectionStateChange(device, status, newState)
+        android.util.Log.d(TAG, "GATT Server Connection Change: State=$newState")
       }
 
       override fun onCharacteristicWriteRequest(
@@ -855,9 +903,11 @@ class ExpoBleCoreModule : Module() {
         value: ByteArray?
       ) {
         super.onCharacteristicWriteRequest(device, requestId, characteristic, preparedWrite, responseNeeded, offset, value)
+        android.util.Log.d(TAG, "GATT Server Write Request")
 
         if (characteristic?.uuid == UUID.fromString(ALERT_CHARACTERISTIC_UUID)) {
           val alertType = value?.firstOrNull()?.toInt() ?: 0
+          android.util.Log.i(TAG, "Received Alert Type: $alertType")
 
           // Send response if needed
           if (responseNeeded) {
@@ -883,6 +933,7 @@ class ExpoBleCoreModule : Module() {
       gattServer = bluetoothManager?.openGattServer(context, gattCallback)
       
       if (gattServer == null) {
+        android.util.Log.e(TAG, "Failed to open GATT Server")
         return false
       }
 
@@ -901,16 +952,19 @@ class ExpoBleCoreModule : Module() {
 
       service.addCharacteristic(alertCharacteristic)
       gattServer?.addService(service)
-
+      android.util.Log.d(TAG, "GATT Server setup complete")
       true
     } catch (e: SecurityException) {
+      android.util.Log.e(TAG, "SecurityException in setupGattServer", e)
       false
     } catch (e: Exception) {
+      android.util.Log.e(TAG, "Exception in setupGattServer", e)
       false
     }
   }
 
   private fun stopGattServer() {
+    android.util.Log.d(TAG, "stopGattServer called")
     try {
       gattServer?.clearServices()
       gattServer?.close()
@@ -921,6 +975,7 @@ class ExpoBleCoreModule : Module() {
   }
 
   private fun sendAlertToStudentSync(deviceAddress: String, alertType: Int, callback: (Boolean, String?) -> Unit) {
+    android.util.Log.d(TAG, "Connecting Sync to $deviceAddress")
     val activity = appContext.activityProvider?.currentActivity
     if (activity == null) {
       callback(false, "No activity")
@@ -944,6 +999,7 @@ class ExpoBleCoreModule : Module() {
     val timeoutRunnable = Runnable {
       if (!callbackCalled) {
         callbackCalled = true
+        android.util.Log.w(TAG, "Sync Connection Timeout")
         callback(false, "Connection timeout")
       }
     }
@@ -954,6 +1010,7 @@ class ExpoBleCoreModule : Module() {
 
       override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
         this.gatt = gatt
+        android.util.Log.d(TAG, "Sync Connect Change: $newState")
         when (newState) {
           BluetoothProfile.STATE_CONNECTED -> {
             try {
@@ -983,6 +1040,7 @@ class ExpoBleCoreModule : Module() {
         }
 
         try {
+          android.util.Log.d(TAG, "Sync writing value: $alertType")
           characteristic.value = byteArrayOf(alertType.toByte())
           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             gatt.writeCharacteristic(characteristic, byteArrayOf(alertType.toByte()), BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT)
@@ -1005,6 +1063,7 @@ class ExpoBleCoreModule : Module() {
         if (!callbackCalled) {
           callbackCalled = true
           if (status == BluetoothGatt.GATT_SUCCESS) {
+            android.util.Log.i(TAG, "Sync Write Success!")
             // Mark as verified
             discoveredStudents.values.find { it.deviceAddress == deviceAddress }?.let {
               it.verified = true
@@ -1020,6 +1079,7 @@ class ExpoBleCoreModule : Module() {
       }
 
       private fun finishWithError(error: String) {
+        android.util.Log.e(TAG, "Sync Error: $error")
         alertHandler?.removeCallbacks(timeoutRunnable)
         if (!callbackCalled) {
           callbackCalled = true
