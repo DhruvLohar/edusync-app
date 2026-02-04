@@ -21,13 +21,12 @@ import type { EventSubscription } from 'expo-modules-core';
 // import { generateShortClassId } from "~/lib/bleHash"; 
 
 interface Student {
-    studentId: number;
+    name: string; // Now stores the combined ID like "BEA848"
     deviceAddress: string;
     rssi: number;
     discoveredAt: number;
     verified: boolean;
     verifiedAt: number | null;
-    name?: string;
 }
 
 interface DebugLog {
@@ -50,10 +49,9 @@ function BleTeacherView() {
     const debugHeight = useRef(new Animated.Value(0)).current;
     const subscriptions = useRef<EventSubscription[]>([]);
 
-    // === CRITICAL FIX ===
-    // Use the Raw ID. Do NOT hash it.
-    const classId = "CSE_BE_SECTION_A"; 
-    // ====================
+    // === UPDATED FOR COMBINED ID LOGIC ===
+    // Professor is looking for students from this class prefix
+    const currentClassPrefix = "BEA"; // Looking for "BEA848", "BEA123", etc.
 
     const addDebugLog = useCallback((message: string, type: DebugLog['type'] = 'info') => {
         setDebugLogs(prev => [
@@ -75,42 +73,47 @@ function BleTeacherView() {
     }, [debugHeight]);
 
     useEffect(() => {
+        console.log('[BLE-Teacher] Setting up event listeners...');
+        console.log('[BLE-Teacher] Looking for students with prefix:', currentClassPrefix);
+        
         // Setup event listeners
         const studentSub = onStudentDiscovered((event) => {
+            console.log('[BLE-Teacher] Student discovered event:', event);
+            
             if (event.error) {
                 addDebugLog(`Scan error: ${event.errorCode}`, 'error');
                 return;
             }
 
-            subscriptions.current = [studentSub, progressSub, bluetoothSub];
+            // UPDATED LOGIC: event.studentId is now a string like "BEA848"
+            const studentLabel = event.studentId.toString(); // Ensure it's a string
+            console.log('[BLE-Teacher] Processing student:', studentLabel);
 
-            // Logic to verify class ID matches is handled in Native, 
-            // but we can double check here
-            if (event.classId !== classId) {
-                 // Ignore stray packets if any leak through
-                 return;
+            // LOGIC ON PROFESSOR DEVICE: Filter by class prefix
+            if (!studentLabel.startsWith(currentClassPrefix)) {
+                console.log('[BLE-Teacher] Ignoring student from different class:', studentLabel);
+                // Ignore students from other classes like "CSB102"
+                return;
             }
 
-            addDebugLog(
-                `Discovered: ID ${event.studentId}, RSSI ${event.rssi}dBm`,
-                'success'
-            );
+            console.log('[BLE-Teacher] Student matches our class prefix!');
+            addDebugLog(`Found: ${studentLabel}`, 'success');
 
             setStudents(prev => {
-                const exists = prev.find(s => s.studentId === event.studentId);
+                const exists = prev.find(s => s.name === studentLabel);
                 if (exists) {
-                    // Update RSSI if needed, but don't duplicate
+                    console.log('[BLE-Teacher] Student already discovered:', studentLabel);
                     return prev;
                 }
 
+                console.log('[BLE-Teacher] Adding new student:', studentLabel);
                 return [...prev, {
-                    studentId: event.studentId,
+                    name: studentLabel, // "BEA848"
                     deviceAddress: event.deviceAddress,
                     rssi: event.rssi,
                     discoveredAt: Date.now(),
                     verified: false,
-                    verifiedAt: null,
-                    name: `Student ${event.studentId}` 
+                    verifiedAt: null
                 }];
             });
         });
@@ -172,6 +175,7 @@ function BleTeacherView() {
     }, [addDebugLog]);
 
     const startScanning = useCallback(async () => {
+        console.log('[BLE-Teacher] Starting scan process...');
         const hasPerms = await requestPermissions();
         if (!hasPerms) return;
 
@@ -183,9 +187,13 @@ function BleTeacherView() {
 
         ExpoBleCore.clearDiscoveredStudents();
         setStudents([]);
-        addDebugLog(`Starting scan for class: ${classId}`, 'info');
+        
+        // Use the prefix for scanning - the native code will handle filtering
+        addDebugLog(`Starting scan for students with prefix: ${currentClassPrefix}`, 'info');
 
-        const result = await ExpoBleCore.startStudentScan(classId);
+        // For now, we'll use the prefix as the scan parameter
+        // The native code might need to be updated to handle prefix-based filtering
+        const result = await ExpoBleCore.startStudentScan(currentClassPrefix);
         if (result.success) {
             setScanning(true);
             addDebugLog('Scanning started', 'success');
@@ -193,7 +201,7 @@ function BleTeacherView() {
             addDebugLog(`Scan failed: ${result.error}`, 'error');
             Alert.alert('Scan Failed', result.error);
         }
-    }, [classId, requestPermissions, addDebugLog]);
+    }, [currentClassPrefix, requestPermissions, addDebugLog]);
 
     const stopScanning = useCallback(() => {
         const result = ExpoBleCore.stopStudentScan();
@@ -277,7 +285,7 @@ function BleTeacherView() {
                 <View className="flex-row items-center justify-between">
                     <View>
                         <Text className="text-2xl font-bold text-gray-900">Roll Call</Text>
-                        <Text className="text-sm text-gray-500 mt-0.5">{classId}</Text>
+                        <Text className="text-sm text-gray-500 mt-0.5">Class: {currentClassPrefix}xxx</Text>
                     </View>
                     <View className="flex-row items-center gap-2">
                         {/* NOTE: For testing, you usually cannot scan and advertise on the 
@@ -374,14 +382,14 @@ function BleTeacherView() {
                             const rssiInfo = getRssiStrength(student.rssi);
                             return (
                                 <View
-                                    key={student.studentId}
+                                    key={student.name} // Using name as key since it's unique
                                     className="bg-white rounded-xl p-4 mb-3 border border-gray-200 shadow-sm"
                                 >
                                     <View className="flex-row items-center justify-between">
                                         <View className="flex-1">
                                             <View className="flex-row items-center gap-2">
                                                 <Text className="text-lg font-semibold text-gray-900">
-                                                    {student.name || `Student ${student.studentId}`}
+                                                    {student.name} {/* Display "BEA848" */}
                                                 </Text>
                                                 {student.verified && (
                                                     <View className="bg-green-100 rounded-full px-2 py-0.5">
@@ -392,7 +400,7 @@ function BleTeacherView() {
                                                 )}
                                             </View>
                                             <Text className="text-sm text-gray-500 mt-0.5">
-                                                ID: {student.studentId}
+                                                Combined ID: {student.name}
                                             </Text>
                                             <View className="flex-row items-center gap-2 mt-2">
                                                 <View className={`h-2 w-2 rounded-full ${rssiInfo.color}`} />

@@ -77,10 +77,11 @@ function BleStudentView() {
     const subscriptions = useRef<EventSubscription[]>([]);
 
     // ==========================================
-    // 2. CONFIGURATION (Long ID now supported!)
+    // 2. CONFIGURATION - Simple Combined ID
     // ==========================================
-    const studentId = 848; // Example ID
-    const classId = "CSE_BE_SECTION_A"; // 16 chars (Fits in 19-char limit!)
+    const classYear = "BEA"; 
+    const rollNumber = "848";
+    const combinedId = `${classYear}${rollNumber}`; // "BEA848"
 
     const addDebugLog = useCallback((message: string, type: DebugLog['type'] = 'info') => {
         setDebugLogs(prev => [{ timestamp: Date.now(), message, type }, ...prev.slice(0, 99)]);
@@ -118,13 +119,11 @@ function BleStudentView() {
 
     // Initialization & Listeners
     useEffect(() => {
-        // Run Calculation Logic on Mount
-        const stats = calculateBLEPacketSize(classId, studentId);
-        addDebugLog(`Class ID: "${classId}"`, 'info');
-        addDebugLog(`Payload: ${stats.payloadSize} / ${stats.maxPayloadSize} bytes`, stats.withinLimit ? 'success' : 'error');
+        // Log combined ID on mount
+        addDebugLog(`Combined ID: "${combinedId}" (${combinedId.length} chars)`, 'info');
         
-        if (!stats.withinLimit) {
-             addDebugLog(`⚠️ ID too long! Max length: ${stats.maxClassIdLength}`, 'warning');
+        if (combinedId.length > 8) {
+            addDebugLog(`⚠️ ID too long! Max length: 8 chars`, 'warning');
         }
 
         // Alert Listener
@@ -161,34 +160,38 @@ function BleStudentView() {
     }, []);
 
     const handleCheckIn = useCallback(async () => {
-        const stats = calculateBLEPacketSize(classId, studentId);
-        if (!stats.withinLimit) {
-            Alert.alert("Configuration Error", `Class ID is too long. Max allowed: ${stats.maxClassIdLength} characters.`);
+        // Check ID length limit (Kotlin validation)
+        if (combinedId.length > 8) {
+            Alert.alert("ID Error", `Combined ID is too long. Max allowed: 8 characters. Current: ${combinedId.length}`);
             return;
         }
 
         const hasPerms = await ExpoBleCore.requestPermissions();
         if (!hasPerms) { 
+            addDebugLog("❌ Bluetooth permissions denied", 'error');
             Alert.alert("Permission Required", "Bluetooth permissions are needed for attendance."); 
             return; 
         }
         
         if (!ExpoBleCore.isBluetoothEnabled()) {
+             addDebugLog("❌ Bluetooth is disabled", 'error');
              await ExpoBleCore.requestEnableBluetooth();
              return;
         }
 
         setIsProcessing(true);
-        addDebugLog(`Initiating Check-In for ${classId}...`, 'info');
+        addDebugLog(`Checking in as: ${combinedId}`, 'info');
         
         try {
-            const result = await ExpoBleCore.checkIn(classId, studentId);
+            // Pass simple string to match Kotlin logic
+            const result = await ExpoBleCore.checkIn(combinedId);
+            
             if (result.success) {
-                addDebugLog('✅ Check-in successful (Advertising Started)', 'success');
+                addDebugLog('✅ Signal Active! Keep app open.', 'success');
                 setCheckedIn(true);
                 setCheckInStatus(ExpoBleCore.getCheckInStatus());
             } else {
-                addDebugLog(`❌ Check-in failed: ${result.error}`, 'error');
+                addDebugLog(`Error: ${result.error}`, 'error');
                 Alert.alert("Check-In Failed", result.error || "Unknown error");
             }
         } catch (e) {
@@ -196,7 +199,7 @@ function BleStudentView() {
         } finally {
             setIsProcessing(false);
         }
-    }, [classId, studentId]);
+    }, [combinedId]);
 
     const handleCheckOut = useCallback(() => {
         ExpoBleCore.checkOut();
@@ -220,7 +223,7 @@ function BleStudentView() {
                     <Text className="text-gray-500 text-center">
                         {checkedIn 
                             ? "Keep the app open until you receive the verification alert." 
-                            : `Class: ${classId}\nID: ${studentId}`}
+                            : `Combined ID: ${combinedId}\nClass: ${classYear} | Roll: ${rollNumber}`}
                     </Text>
                 </View>
 
