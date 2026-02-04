@@ -8,7 +8,8 @@ import {
     ScrollView,
     Animated,
     Alert,
-    Vibration
+    Vibration,
+    Platform
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import ExpoBleCore, {
@@ -21,13 +22,43 @@ import type { EventSubscription } from 'expo-modules-core';
 interface DebugLog {
     timestamp: number;
     message: string;
-    type: 'info' | 'success' | 'error';
+    type: 'info' | 'success' | 'error' | 'warning';
 }
 
 interface CheckInStatusData {
     classId: string;
     studentId: number;
     checkedInAt: number;
+}
+
+// ==========================================
+// 1. UPDATED PACKET CALCULATOR (Split Logic)
+// ==========================================
+function calculateBLEPacketSize(classId: string, studentId: number) {
+    // Payload Structure: [ClassID Bytes] + "_" (1 byte) + [StudentID (4 bytes)]
+    const classIdBytes = new TextEncoder().encode(classId).length;
+    const separatorBytes = 1; 
+    const studentIdBytes = 4; 
+    
+    const payloadSize = classIdBytes + separatorBytes + studentIdBytes;
+
+    // Android Legacy Advertising Limit: 31 Bytes
+    // Mandatory Overhead:
+    // - Flags: 3 bytes
+    // - Manufacturer Header: 4 bytes
+    // Total Overhead = 7 bytes
+    const overhead = 7;
+    
+    // Available Space for Payload = 31 - 7 = 24 bytes
+    const maxPayloadSize = 31 - overhead;
+
+    return {
+        payloadSize,
+        maxPayloadSize,
+        withinLimit: payloadSize <= maxPayloadSize,
+        // Max chars for Class ID = 24 - 1 (separator) - 4 (studentId) = 19 chars
+        maxClassIdLength: maxPayloadSize - separatorBytes - studentIdBytes 
+    };
 }
 
 function BleStudentView() {
@@ -39,439 +70,228 @@ function BleStudentView() {
     const [isProcessing, setIsProcessing] = useState(false);
 
     // Debug state
-    const [debugExpanded, setDebugExpanded] = useState(false);
+    const [debugExpanded, setDebugExpanded] = useState(true);
     const [debugLogs, setDebugLogs] = useState<DebugLog[]>([]);
-    const debugHeight = useRef(new Animated.Value(0)).current;
+    const debugHeight = useRef(new Animated.Value(300)).current; // Start expanded
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const subscriptions = useRef<EventSubscription[]>([]);
 
-    // Replace with actual student data
-    const studentId = 848;
-    const studentName = "John Doe";
-    const classId = "CLASS_A_BE";
+    // ==========================================
+    // 2. CONFIGURATION - Simple Combined ID
+    // ==========================================
+    const classYear = "BEA"; 
+    const rollNumber = "848";
+    const combinedId = `${classYear}${rollNumber}`; // "BEA848"
 
     const addDebugLog = useCallback((message: string, type: DebugLog['type'] = 'info') => {
-        setDebugLogs(prev => [
-            { timestamp: Date.now(), message, type },
-            ...prev.slice(0, 49)
-        ]);
+        setDebugLogs(prev => [{ timestamp: Date.now(), message, type }, ...prev.slice(0, 99)]);
     }, []);
 
     const toggleDebug = useCallback(() => {
         setDebugExpanded(prev => {
             const newState = !prev;
-            Animated.timing(debugHeight, {
-                toValue: newState ? 300 : 0,
-                duration: 300,
-                useNativeDriver: false,
+            Animated.timing(debugHeight, { 
+                toValue: newState ? 300 : 0, 
+                duration: 300, 
+                useNativeDriver: false 
             }).start();
             return newState;
         });
     }, [debugHeight]);
 
-    // Pulse animation for checked-in state
+    // Format timestamp for logs
+    const formatTime = (ms: number) => {
+        const d = new Date(ms);
+        return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`;
+    };
+
+    // Animation Effect
     useEffect(() => {
         if (checkedIn && !alertReceived) {
-            Animated.loop(
-                Animated.sequence([
-                    Animated.timing(pulseAnim, {
-                        toValue: 1.1,
-                        duration: 1000,
-                        useNativeDriver: true,
-                    }),
-                    Animated.timing(pulseAnim, {
-                        toValue: 1,
-                        duration: 1000,
-                        useNativeDriver: true,
-                    }),
-                ])
-            ).start();
+            Animated.loop(Animated.sequence([
+                Animated.timing(pulseAnim, { toValue: 1.05, duration: 1000, useNativeDriver: true }),
+                Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+            ])).start();
         } else {
             pulseAnim.setValue(1);
         }
-    }, [checkedIn, alertReceived, pulseAnim]);
+    }, [checkedIn, alertReceived]);
 
+    // Initialization & Listeners
     useEffect(() => {
-        // Setup event listeners
+        // Log combined ID on mount
+        addDebugLog(`Combined ID: "${combinedId}" (${combinedId.length} chars)`, 'info');
+        
+        if (combinedId.length > 8) {
+            addDebugLog(`⚠️ ID too long! Max length: 8 chars`, 'warning');
+        }
+
+        // Alert Listener
         const alertSub = addAlertReceivedListener((event) => {
-            addDebugLog(`Alert received: Type ${event.alertType}`, 'success');
-
+            addDebugLog(`🔔 Alert Received: Type ${event.alertType}`, 'success');
             setAlertReceived(true);
-
-            // Play sound/vibration based on alert type
-            if (event.alertType === BleConstants.ALERT_TYPE_BEEP ||
-                event.alertType === BleConstants.ALERT_TYPE_BOTH) {
-                // Play beep sound here
-                addDebugLog('Playing beep sound', 'info');
-            }
-
-            if (event.alertType === BleConstants.ALERT_TYPE_VIBRATE ||
-                event.alertType === BleConstants.ALERT_TYPE_BOTH) {
+            if (event.alertType === BleConstants.ALERT_TYPE_VIBRATE || event.alertType === BleConstants.ALERT_TYPE_BOTH) {
                 Vibration.vibrate([0, 500, 200, 500]);
-                addDebugLog('Vibrating device', 'info');
             }
-
-            // Show alert
-            Alert.alert(
-                '✅ Attendance Verified',
-                'Your presence has been confirmed!',
-                [{ text: 'OK' }]
-            );
+            Alert.alert('✅ Attendance Verified', 'Your attendance has been marked by the professor.');
         });
 
-        const bluetoothSub = addBluetoothStateChangedListener((event) => {
+        // Bluetooth State Listener
+        const btSub = addBluetoothStateChangedListener((event) => {
             setBluetoothEnabled(event.enabled);
-            addDebugLog(
-                `Bluetooth ${event.enabled ? 'enabled' : 'disabled'}`,
-                event.enabled ? 'success' : 'error'
-            );
-
-            if (!event.enabled && checkedIn) {
-                Alert.alert(
-                    'Bluetooth Disabled',
-                    'Please keep Bluetooth on to maintain attendance tracking'
-                );
-            }
+            addDebugLog(`Bluetooth is now ${event.enabled ? 'ON' : 'OFF'}`, event.enabled ? 'success' : 'error');
         });
 
-        subscriptions.current = [alertSub, bluetoothSub];
+        subscriptions.current = [alertSub, btSub];
         ExpoBleCore.startBluetoothStateListener();
 
-        // Check if already checked in
+        // Restore State
         const status = ExpoBleCore.getCheckInStatus();
         if (status) {
             setCheckedIn(true);
             setCheckInStatus(status);
-            addDebugLog('Already checked in', 'success');
+            addDebugLog('Session restored: You are checked in.', 'success');
         }
 
         return () => {
             subscriptions.current.forEach(sub => sub.remove());
             ExpoBleCore.stopBluetoothStateListener();
         };
-    }, [addDebugLog, checkedIn]);
-
-    const requestPermissions = useCallback(async () => {
-        const hasPerms = ExpoBleCore.hasPermissions();
-        if (hasPerms) {
-            addDebugLog('Permissions already granted', 'success');
-            return true;
-        }
-
-        addDebugLog('Requesting BLE permissions...', 'info');
-        const granted = await ExpoBleCore.requestPermissions();
-
-        if (granted) {
-            addDebugLog('Permissions granted', 'success');
-            return true;
-        } else {
-            addDebugLog('Permissions denied', 'error');
-            Alert.alert('Permissions Required', 'Please enable Bluetooth permissions');
-            return false;
-        }
-    }, [addDebugLog]);
+    }, []);
 
     const handleCheckIn = useCallback(async () => {
-        const hasPerms = await requestPermissions();
-        if (!hasPerms) return;
-
-        if (!ExpoBleCore.isBluetoothEnabled()) {
-            Alert.alert('Bluetooth Disabled', 'Please enable Bluetooth to check in');
-            await ExpoBleCore.requestEnableBluetooth();
+        // Check ID length limit (Kotlin validation)
+        if (combinedId.length > 8) {
+            Alert.alert("ID Error", `Combined ID is too long. Max allowed: 8 characters. Current: ${combinedId.length}`);
             return;
         }
 
+        const hasPerms = await ExpoBleCore.requestPermissions();
+        if (!hasPerms) { 
+            addDebugLog("❌ Bluetooth permissions denied", 'error');
+            Alert.alert("Permission Required", "Bluetooth permissions are needed for attendance."); 
+            return; 
+        }
+        
+        if (!ExpoBleCore.isBluetoothEnabled()) {
+             addDebugLog("❌ Bluetooth is disabled", 'error');
+             await ExpoBleCore.requestEnableBluetooth();
+             return;
+        }
+
         setIsProcessing(true);
-        addDebugLog(`Checking in to ${classId} as student ${studentId}`, 'info');
-
+        addDebugLog(`Checking in as: ${combinedId}`, 'info');
+        
         try {
-            const result = await ExpoBleCore.checkIn(classId, studentId);
-
+            // Pass simple string to match Kotlin logic
+            const result = await ExpoBleCore.checkIn(combinedId);
+            
             if (result.success) {
+                addDebugLog('✅ Signal Active! Keep app open.', 'success');
                 setCheckedIn(true);
-                const status = ExpoBleCore.getCheckInStatus();
-                setCheckInStatus(status);
-                addDebugLog('Check-in successful - Advertising started', 'success');
-
-                Alert.alert(
-                    '✅ Checked In',
-                    `You are now checked in to ${classId}\n\nWaiting for roll call...`,
-                    [{ text: 'OK' }]
-                );
+                setCheckInStatus(ExpoBleCore.getCheckInStatus());
             } else {
-                addDebugLog(`Check-in failed: ${result.error}`, 'error');
-                Alert.alert('Check-in Failed', result.error);
+                addDebugLog(`Error: ${result.error}`, 'error');
+                Alert.alert("Check-In Failed", result.error || "Unknown error");
             }
-        } catch (error) {
-            addDebugLog(`Check-in error: ${error}`, 'error');
-            Alert.alert('Error', 'Failed to check in. Please try again.');
+        } catch (e) {
+            addDebugLog(`Exception: ${e}`, 'error');
         } finally {
             setIsProcessing(false);
         }
-    }, [classId, studentId, requestPermissions, addDebugLog]);
+    }, [combinedId]);
 
     const handleCheckOut = useCallback(() => {
-        Alert.alert(
-            'Check Out',
-            'Are you sure you want to check out?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Check Out',
-                    style: 'destructive',
-                    onPress: () => {
-                        const result = ExpoBleCore.checkOut();
-                        if (result.success) {
-                            setCheckedIn(false);
-                            setCheckInStatus(null);
-                            setAlertReceived(false);
-                            addDebugLog('Checked out - Advertising stopped', 'info');
-                        } else {
-                            addDebugLog(`Check-out failed: ${result.error}`, 'error');
-                        }
-                    }
-                }
-            ]
-        );
-    }, [addDebugLog]);
-
-    const formatTime = (timestamp: number) => {
-        const date = new Date(timestamp);
-        return date.toLocaleTimeString();
-    };
-
-    const formatDuration = (startTime: number) => {
-        const duration = Math.floor((Date.now() - startTime) / 1000);
-        const minutes = Math.floor(duration / 60);
-        const seconds = duration % 60;
-        return `${minutes}m ${seconds}s`;
-    };
-
-    const getStatusColor = () => {
-        if (alertReceived) return 'bg-green-500';
-        if (checkedIn) return 'bg-yellow-500';
-        return 'bg-gray-300';
-    };
-
-    const getStatusText = () => {
-        if (alertReceived) return '✅ Attendance Verified';
-        if (checkedIn) return '⏳ Waiting for Roll Call...';
-        return '📍 Ready to Check In';
-    };
+        ExpoBleCore.checkOut();
+        setCheckedIn(false);
+        setCheckInStatus(null);
+        setAlertReceived(false);
+        addDebugLog('Checked out successfully.', 'info');
+    }, []);
 
     return (
         <SafeAreaView className="flex-1 bg-gray-50">
             <StatusBar barStyle="dark-content" />
-
-            {/* Header */}
-            <View className="px-6 pt-4 pb-3 bg-white border-b border-gray-200">
-                <View className="flex-row items-center justify-between">
-                    <Text className="text-2xl font-bold text-gray-900">Attendance</Text>
-                    <Pressable
-                        onPress={() => router.push("/private/ble-teacher")}
-                        className="bg-teal-100 px-3 py-2 rounded-lg"
-                    >
-                        <Text className="text-teal-700 font-semibold text-xs">
-                            Switch to Teacher
-                        </Text>
-                    </Pressable>
-                </View>
-                <View className="mt-3 bg-gray-100 rounded-xl p-4">
-                    <Text className="text-gray-600 text-sm">Student</Text>
-                    <Text className="text-gray-900 text-lg font-semibold mt-0.5">
-                        {studentName}
+            
+            <View className="flex-1 items-center justify-center p-6">
+                
+                {/* Status Header */}
+                <View className="mb-10 items-center">
+                    <Text className="text-2xl font-bold text-gray-800 mb-2">
+                        {checkedIn ? "You are Checked In" : "Not Checked In"}
                     </Text>
-                    <Text className="text-gray-500 text-sm mt-1">ID: {studentId}</Text>
-                </View>
-
-                {/* Bluetooth Status Warning */}
-                {!bluetoothEnabled && (
-                    <View className="mt-3 bg-red-50 border border-red-200 rounded-lg p-3">
-                        <Text className="text-red-700 text-sm font-medium">
-                            ⚠️ Bluetooth is disabled
-                        </Text>
-                    </View>
-                )}
-            </View>
-
-            <ScrollView className="flex-1" contentContainerClassName="px-6 py-6">
-                {/* Class Info */}
-                <View className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm mb-6">
-                    <Text className="text-gray-600 text-sm">Class</Text>
-                    <Text className="text-gray-900 text-xl font-bold mt-1">
-                        {classId}
+                    <Text className="text-gray-500 text-center">
+                        {checkedIn 
+                            ? "Keep the app open until you receive the verification alert." 
+                            : `Combined ID: ${combinedId}\nClass: ${classYear} | Roll: ${rollNumber}`}
                     </Text>
                 </View>
 
-                {/* Main Check-In Button */}
-                <View className="items-center mb-6">
-                    <Animated.View
-                        style={{
-                            transform: [{ scale: checkedIn && !alertReceived ? pulseAnim : 1 }],
-                        }}
-                    >
+                {/* Main Action Button */}
+                <View className="items-center mb-10">
+                    <Animated.View style={{ transform: [{ scale: checkedIn && !alertReceived ? pulseAnim : 1 }] }}>
                         <Pressable
                             onPress={checkedIn ? handleCheckOut : handleCheckIn}
                             disabled={isProcessing}
-                            className={`h-48 w-48 rounded-full items-center justify-center shadow-lg ${alertReceived ? 'bg-green-500' :
-                                checkedIn ? 'bg-yellow-500' :
-                                    'bg-teal-500'
-                                } ${isProcessing ? 'opacity-50' : ''}`}
+                            className={`h-48 w-48 rounded-full items-center justify-center shadow-xl border-4 ${
+                                alertReceived ? 'bg-green-500 border-green-600' :
+                                checkedIn ? 'bg-yellow-400 border-yellow-500' :
+                                'bg-blue-500 border-blue-600'
+                            } ${isProcessing ? 'opacity-80' : ''}`}
                         >
-                            <Text className="text-white text-5xl mb-2">
-                                {alertReceived ? '✅' : checkedIn ? '⏳' : '📍'}
+                            <Text className="text-white text-6xl mb-2 shadow-sm">
+                                {alertReceived ? '✅' : checkedIn ? '📡' : '👆'}
                             </Text>
-                            <Text className="text-white text-base font-semibold text-center px-6">
-                                {isProcessing ? 'Processing...' :
-                                    alertReceived ? 'Verified' :
-                                        checkedIn ? 'Checked In' :
-                                            'Check In'}
+                            <Text className="text-white text-xl font-bold shadow-sm uppercase tracking-wider">
+                                {isProcessing ? '...' : checkedIn ? 'Check Out' : 'Check In'}
                             </Text>
                         </Pressable>
                     </Animated.View>
-                </View>
-
-                {/* Status Card */}
-                <View className={`rounded-2xl p-5 ${alertReceived ? 'bg-green-50 border-green-200' :
-                    checkedIn ? 'bg-yellow-50 border-yellow-200' :
-                        'bg-gray-100 border-gray-200'
-                    } border-2`}>
-                    <Text className={`text-center font-semibold text-base ${alertReceived ? 'text-green-700' :
-                        checkedIn ? 'text-yellow-700' :
-                            'text-gray-600'
-                        }`}>
-                        {getStatusText()}
-                    </Text>
-
-                    {checkedIn && checkInStatus && (
-                        <View className="mt-4 pt-4 border-t border-gray-200">
-                            <View className="flex-row justify-between items-center mb-2">
-                                <Text className="text-gray-600 text-sm">Checked in at</Text>
-                                <Text className="text-gray-900 text-sm font-medium">
-                                    {formatTime(checkInStatus.checkedInAt)}
-                                </Text>
-                            </View>
-                            <View className="flex-row justify-between items-center">
-                                <Text className="text-gray-600 text-sm">Duration</Text>
-                                <Text className="text-gray-900 text-sm font-medium">
-                                    {formatDuration(checkInStatus.checkedInAt)}
-                                </Text>
-                            </View>
-                        </View>
+                    
+                    {checkedIn && !alertReceived && (
+                        <Text className="mt-6 text-yellow-600 font-medium animate-pulse">
+                            Broadcasting signal...
+                        </Text>
                     )}
                 </View>
 
-                {/* Instructions */}
-                {!checkedIn && !alertReceived && (
-                    <View className="mt-6 bg-blue-50 rounded-xl p-4 border border-blue-200">
-                        <Text className="text-blue-900 font-semibold mb-2">
-                            📋 How it works
-                        </Text>
-                        <Text className="text-blue-700 text-sm leading-5">
-                            1. Tap the button to check in{'\n'}
-                            2. Keep Bluetooth enabled{'\n'}
-                            3. Wait for the teacher's roll call{'\n'}
-                            4. Your device will beep when verified
-                        </Text>
-                    </View>
-                )}
+            </View>
 
-                {checkedIn && !alertReceived && (
-                    <View className="mt-6 bg-yellow-50 rounded-xl p-4 border border-yellow-200">
-                        <Text className="text-yellow-900 font-semibold mb-2">
-                            ⚠️ Important
-                        </Text>
-                        <Text className="text-yellow-700 text-sm leading-5">
-                            • Keep this app open{'\n'}
-                            • Keep Bluetooth enabled{'\n'}
-                            • Stay in the classroom{'\n'}
-                            • Wait for the roll call alert
-                        </Text>
-                    </View>
-                )}
-
-                {alertReceived && (
-                    <View className="mt-6 bg-green-50 rounded-xl p-4 border border-green-200">
-                        <Text className="text-green-900 font-semibold mb-2">
-                            ✅ Success!
-                        </Text>
-                        <Text className="text-green-700 text-sm">
-                            Your attendance has been verified. You can now check out or keep the app open.
-                        </Text>
-                    </View>
-                )}
-            </ScrollView>
-
-            {/* Floating Debug Panel */}
-            <View className="absolute bottom-4 right-4">
-                <Pressable
-                    onPress={toggleDebug}
-                    className="bg-gray-900 rounded-full px-4 py-3 shadow-lg mb-2"
-                >
-                    <Text className="text-white text-xs font-mono font-medium">
-                        {debugExpanded ? '▼' : '▲'} DEBUG
+            {/* Debug Console (Collapsible) */}
+            <View className="bg-gray-900 border-t border-gray-800">
+                 <Pressable onPress={toggleDebug} className="p-3 flex-row justify-between items-center bg-gray-800">
+                    <Text className="text-white font-mono text-xs font-bold">
+                        CONSOLE LOGS ({debugLogs.length})
                     </Text>
-                </Pressable>
-
-                <Animated.View
-                    style={{ height: debugHeight, overflow: 'hidden' }}
-                    className="bg-gray-900 rounded-2xl shadow-2xl w-80"
-                >
-                    <View className="p-4 border-b border-gray-700">
-                        <Text className="text-white font-semibold text-sm">Debug Console</Text>
-                        <View className="flex-row gap-4 mt-2">
-                            <View>
-                                <Text className="text-gray-400 text-xs">Status</Text>
-                                <Text className={`text-xs font-medium ${checkedIn ? 'text-green-400' : 'text-gray-400'
-                                    }`}>
-                                    {checkedIn ? 'Advertising' : 'Idle'}
-                                </Text>
-                            </View>
-                            <View>
-                                <Text className="text-gray-400 text-xs">BLE</Text>
-                                <Text className={`text-xs font-medium ${bluetoothEnabled ? 'text-green-400' : 'text-red-400'
-                                    }`}>
-                                    {bluetoothEnabled ? 'ON' : 'OFF'}
-                                </Text>
-                            </View>
-                            <View>
-                                <Text className="text-gray-400 text-xs">Alert</Text>
-                                <Text className={`text-xs font-medium ${alertReceived ? 'text-green-400' : 'text-gray-400'
-                                    }`}>
-                                    {alertReceived ? 'Received' : 'Waiting'}
-                                </Text>
-                            </View>
-                        </View>
-                    </View>
-                    <ScrollView className="flex-1 p-3">
+                    <Text className="text-gray-400 text-xs">
+                        {debugExpanded ? '▼ Collapse' : '▲ Expand'}
+                    </Text>
+                 </Pressable>
+                 
+                 <Animated.View style={{ height: debugHeight }} className="w-full">
+                    <ScrollView className="p-3" nestedScrollEnabled>
                         {debugLogs.length === 0 ? (
-                            <Text className="text-gray-500 text-xs text-center py-4">
-                                No logs yet
-                            </Text>
+                            <Text className="text-gray-600 text-xs italic">No logs yet...</Text>
                         ) : (
-                            debugLogs.map((log, index) => (
-                                <View key={index} className="mb-2">
-                                    <View className="flex-row items-start gap-2">
-                                        <Text className={`text-xs ${log.type === 'success' ? 'text-green-400' :
-                                            log.type === 'error' ? 'text-red-400' :
-                                                'text-blue-400'
-                                            }`}>
-                                            {log.type === 'success' ? '✓' : log.type === 'error' ? '✗' : 'ℹ'}
-                                        </Text>
-                                        <View className="flex-1">
-                                            <Text className="text-gray-300 text-xs font-mono leading-4">
-                                                {log.message}
-                                            </Text>
-                                            <Text className="text-gray-500 text-[10px] font-mono mt-0.5">
-                                                {formatTime(log.timestamp)}
-                                            </Text>
-                                        </View>
-                                    </View>
+                            debugLogs.map((log, i) => (
+                                <View key={i} className="mb-2 flex-row">
+                                    <Text className="text-gray-500 text-[10px] font-mono mr-2 mt-0.5">
+                                        {formatTime(log.timestamp)}
+                                    </Text>
+                                    <Text className={`text-xs font-mono flex-1 ${
+                                        log.type === 'error' ? 'text-red-400 font-bold' : 
+                                        log.type === 'success' ? 'text-green-400 font-bold' : 
+                                        log.type === 'warning' ? 'text-yellow-400' :
+                                        'text-gray-300'
+                                    }`}>
+                                        {log.type === 'success' ? '✓ ' : log.type === 'error' ? '✗ ' : '> '} 
+                                        {log.message}
+                                    </Text>
                                 </View>
                             ))
                         )}
                     </ScrollView>
-                </Animated.View>
+                 </Animated.View>
             </View>
         </SafeAreaView>
     );

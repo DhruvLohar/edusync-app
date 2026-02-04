@@ -83,8 +83,9 @@ declare class ExpoBleCoreModule extends NativeModule<BleModuleEvents> {
 
   // ============== STUDENT FUNCTIONS ==============
   checkIn(
-    classId: string,
-    studentId: number
+    // classId: string,
+    // studentId: number
+    combinedId: string
   ): Promise<{ success: boolean; error?: string }>;
   checkOut(): { success: boolean; error?: string };
   isCheckedIn(): boolean;
