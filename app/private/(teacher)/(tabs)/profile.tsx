@@ -4,6 +4,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { fetchFromAPI } from '~/lib/api';
 import { useAuthStore } from '~/lib/store/auth.store';
+import { renderAPIImage } from '~/lib/ImageChecker';
 
 // --- REUSABLE PROFILE ROW COMPONENT ---
 interface ProfileRowProps {
@@ -81,15 +82,6 @@ const ProfileScreen: React.FC = () => {
         fetchProfile();
     }, []);
 
-    // Helper to fix local photo URL if needed
-    const getProfilePhotoUrl = (url?: string | null) => {
-        if (!url) return undefined;
-        if (url.startsWith('http://127.0.0.1:8000')) {
-            return url.replace('http://127.0.0.1:8000', 'https://d7e21c34a21f.ngrok-free.app');
-        }
-        return url;
-    };
-
     if (loading) {
         return (
             <SafeAreaView className="flex-1 bg-white items-center justify-center">
@@ -117,7 +109,7 @@ const ProfileScreen: React.FC = () => {
                     {/* Profile Picture */}
                     {profile.profile_photo ? (
                         <Image
-                            source={{ uri: getProfilePhotoUrl(profile.profile_photo) }}
+                            source={{ uri: renderAPIImage(profile.profile_photo) }}
                             className="w-24 h-24 rounded-full border-4 border-white shadow-md mb-4"
                             style={{ width: 96, height: 96, borderRadius: 48, marginBottom: 16 }}
                         />
@@ -140,6 +132,7 @@ const ProfileScreen: React.FC = () => {
                         <ProfileRow iconName="person-outline" title="Name" value={profile.name || ''} />
                         <ProfileRow iconName="at-outline" title="Email" value={profile.email || ''} />
                         <ProfileRow iconName="call-outline" title="Phone" value={profile.phone || ''} />
+                        <ProfileRow iconName="reader-outline" title="Employee ID" value={profile.employee_id || ''} />
                         <ProfileRow iconName="school-outline" title="User Type" value={profile.user_type || ''} />
                     </View>
                     {/* Section 2: ACTIONS AND LOGOUT */}

@@ -28,25 +28,13 @@ const editProfileSchema = z.object({
     name: z.string().min(2, { message: 'Name must be at least 2 characters long' }),
     email: z.string().email({ message: 'Please enter a valid email address' }),
     phone: z.string().min(10, { message: 'Please enter a valid phone number' }),
-    dateOfBirth: z.date({ message: 'Date of birth is required' }),
-    gender: z.enum(['male', 'female', 'other', 'prefer-not-to-say'], { 
-        message: 'Please select a gender' 
-    }),
 });
 
 type EditProfileFormData = z.infer<typeof editProfileSchema>;
 
-const genderOptions = [
-    { value: 'male', label: 'Male', icon: 'male' },
-    { value: 'female', label: 'Female', icon: 'female' },
-    { value: 'other', label: 'Other', icon: 'person' },
-    { value: 'prefer-not-to-say', label: 'Prefer not to say', icon: 'help-circle' },
-];
-
 export default function EditProfileScreen() {
     const router = useRouter();
     const { profile, refreshUser } = useAuthStore();
-    const [showDatePicker, setShowDatePicker] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [hasImageChanged, setHasImageChanged] = useState(false);
@@ -57,8 +45,6 @@ export default function EditProfileScreen() {
             name: '',
             email: '',
             phone: '',
-            dateOfBirth: new Date(),
-            gender: 'prefer-not-to-say',
         }
     });
 
@@ -69,8 +55,6 @@ export default function EditProfileScreen() {
                 name: profile.name || '',
                 email: profile.email || '',
                 phone: profile.phone || '',
-                dateOfBirth: profile.dateOfBirth ? new Date(profile.dateOfBirth) : new Date(),
-                gender: (profile.gender as any) || 'prefer-not-to-say',
             });
             
             // Set initial profile photo if exists
@@ -79,24 +63,6 @@ export default function EditProfileScreen() {
             }
         }
     }, [profile, reset]);
-
-    const selectedDate = watch('dateOfBirth');
-    const selectedGender = watch('gender');
-
-    const onDateChange = (event: any, selectedDate?: Date) => {
-        setShowDatePicker(Platform.OS === 'ios');
-        if (selectedDate) {
-            setValue('dateOfBirth', selectedDate);
-        }
-    };
-
-    const formatDate = (date: Date) => {
-        return date.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
-    };
 
     const handleProfilePhotoUpdate = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -154,8 +120,6 @@ export default function EditProfileScreen() {
             formData.append("name", data.name);
             formData.append("email", data.email);
             formData.append("phone", data.phone);
-            formData.append("dateOfBirth", data.dateOfBirth.toISOString());
-            formData.append("gender", data.gender);
 
             // Only include profile_photo if the user has changed it
             if (hasImageChanged && selectedImage) {
@@ -320,93 +284,6 @@ export default function EditProfileScreen() {
                                 />
                             )}
                         />
-
-                        {/* Date of Birth Field */}
-                        <Controller
-                            control={control}
-                            name="dateOfBirth"
-                            render={({ field: { value } }) => (
-                                <View className="mb-6">
-                                    <Text className="text-gray-700 font-medium mb-2">Date of Birth</Text>
-                                    <TouchableOpacity
-                                        onPress={() => setShowDatePicker(true)}
-                                        className={`border-2 rounded-xl px-4 py-4 bg-gray-50 flex-row items-center justify-between ${
-                                            errors.dateOfBirth ? 'border-red-500' : 'border-gray-200'
-                                        }`}
-                                    >
-                                        <Text className="text-base text-gray-800">
-                                            {value ? formatDate(value) : 'Select your date of birth'}
-                                        </Text>
-                                        <Ionicons name="calendar-outline" size={20} color="#374151" />
-                                    </TouchableOpacity>
-                                    {errors.dateOfBirth && (
-                                        <Text className="text-red-500 text-sm mt-1">
-                                            {errors.dateOfBirth.message}
-                                        </Text>
-                                    )}
-                                </View>
-                            )}
-                        />
-
-                        {/* Gender Field */}
-                        <Controller
-                            control={control}
-                            name="gender"
-                            render={({ field: { onChange, value } }) => (
-                                <View className="mb-6">
-                                    <Text className="text-gray-700 font-medium mb-3">Gender</Text>
-                                    <View className="gap-y-3">
-                                        {genderOptions.map((option: { value: string; label: string; icon: string }) => (
-                                            <TouchableOpacity
-                                                key={option.value}
-                                                onPress={() => onChange(option.value)}
-                                                className={`flex-row items-center p-4 rounded-xl border-2 ${
-                                                    selectedGender === option.value
-                                                        ? 'border-blue-500 bg-blue-50'
-                                                        : 'border-gray-200 bg-gray-50'
-                                                }`}
-                                            >
-                                                <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
-                                                    selectedGender === option.value ? 'bg-blue-500' : 'bg-gray-300'
-                                                }`}>
-                                                    <Ionicons 
-                                                        name={option.icon as any} 
-                                                        size={18} 
-                                                        color={selectedGender === option.value ? 'white' : '#6B7280'} 
-                                                    />
-                                                </View>
-                                                <Text className={`font-medium ${
-                                                    selectedGender === option.value ? 'text-blue-700' : 'text-gray-700'
-                                                }`}>
-                                                    {option.label}
-                                                </Text>
-                                                {selectedGender === option.value && (
-                                                    <View className="ml-auto">
-                                                        <Ionicons name="checkmark-circle" size={20} color="#3B82F6" />
-                                                    </View>
-                                                )}
-                                            </TouchableOpacity>
-                                        ))}
-                                    </View>
-                                    {errors.gender && (
-                                        <Text className="text-red-500 text-sm mt-1">
-                                            {errors.gender.message}
-                                        </Text>
-                                    )}
-                                </View>
-                            )}
-                        />
-
-                        {showDatePicker && (
-                            <DateTimePicker
-                                value={selectedDate || new Date()}
-                                mode="date"
-                                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                                onChange={onDateChange}
-                                maximumDate={new Date()}
-                                minimumDate={new Date(1900, 0, 1)}
-                            />
-                        )}
                     </View>
 
                     {/* Action Buttons */}

@@ -183,8 +183,8 @@ export default function StudentRegistrationScreen() {
       formData.append('email', email);
       formData.append('phone', phoneNumber);
       formData.append('user_type', 'student');
-      formData.append('Department', selectedDepartment || '');
-      formData.append('Year', selectedAcademicYear || '');
+      formData.append('department', selectedDepartment || '');
+      formData.append('year', selectedAcademicYear || '');
       formData.append('gr_no', grNumber);
       if (capturedImageUri) {
         formData.append('profile_photo', {

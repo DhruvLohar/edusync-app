@@ -3,6 +3,7 @@ import { View, Text, SafeAreaView, StatusBar, ScrollView, TouchableOpacity, Dime
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient'; 
 import { fetchFromAPI } from '~/lib/api';
+import { renderAPIImage } from '~/lib/ImageChecker';
 
 // --- MOCK DATA ---
 interface ClassAttendance {
@@ -129,10 +130,7 @@ const HomeScreen: React.FC = () => {
             // };
             if (res && res.success && res.data) {
                 setTeacherName(res.data.name || 'Teacher');
-                let url = res.data.profile_photo;
-                if (url && url.startsWith('http://127.0.0.1:8000')) {
-                    url = url.replace('http://127.0.0.1:8000', 'https://d7e21c34a21f.ngrok-free.app');
-                }
+                let url = renderAPIImage(res.data.profile_photo);
                 setProfilePhoto(url || null);
             }
         };
