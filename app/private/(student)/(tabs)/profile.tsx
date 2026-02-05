@@ -1,16 +1,17 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, SafeAreaView, StatusBar, ScrollView, TouchableOpacity, StyleSheet, Image } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, SafeAreaView, StatusBar, ScrollView, TouchableOpacity, StyleSheet, Image, RefreshControl } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { fetchFromAPI } from '~/lib/api';
-import type { Student } from '~/type/Student';
 import { useAuthStore } from '~/lib/store/auth.store';
+import { renderAPIImage } from '~/lib/ImageChecker';
 
 // --- MAIN SCREEN COMPONENT ---
 const ProfileScreen: React.FC = () => {
     const router = useRouter();
     const [profile, setProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const Authstore = useAuthStore();
     const handleAction = async (action: string) => {
         if (action === 'Log Out') {
@@ -19,28 +20,41 @@ const ProfileScreen: React.FC = () => {
         }
     };
 
-    useEffect(() => {
-        const fetchProfile = async () => {
+    const fetchProfile = useCallback(async (isRefresh = false) => {
+        if (isRefresh) {
+            setRefreshing(true);
+        } else {
             setLoading(true);
-            const res = await fetchFromAPI<any>('/users/profile');
-            if (res && res.success && res.data) {
-                setProfile(res.data);
-            } else {
-                setProfile(null);
-            }
-            setLoading(false);
-        };
-        fetchProfile();
+        }
+
+        const res = await fetchFromAPI<any>('/users/profile');
+        // DUMMY DATA
+        // const res = {
+        //   success: true,
+        //   data: {
+        //     id: 1,
+        //     name: 'Nandani Kadave',
+        //     email: 'nandani@example.com',
+        //     phone: '+91-9876543210',
+        //     user_type: 'student',
+        //     gr_no: 'CS2021001',
+        //     profile_photo: 'https://via.placeholder.com/150',
+        //     onboarding_done: true
+        //   }
+        // };
+        if (res && res.success && res.data) {
+            setProfile(res.data);
+        } else {
+            setProfile(null);
+        }
+
+        setLoading(false);
+        setRefreshing(false);
     }, []);
 
-    // Helper to fix local photo URL if needed
-    const getProfilePhotoUrl = (url?: string | null) => {
-        if (!url) return undefined;
-        if (url.startsWith('http://127.0.0.1:8000')) {
-            return url.replace('http://127.0.0.1:8000', 'https://d7e21c34a21f.ngrok-free.app');
-        }
-        return url;
-    };
+    useEffect(() => {
+        fetchProfile();
+    }, [fetchProfile]);
 
     if (loading) {
         return (
@@ -63,13 +77,20 @@ const ProfileScreen: React.FC = () => {
     return (
         <SafeAreaView className="flex-1 bg-white">
             <StatusBar barStyle="dark-content" />
-            <ScrollView className="flex-1 mb-20 mt-5" showsVerticalScrollIndicator={false} style={styles.container}>
+            <ScrollView
+                className="flex-1 mb-20 mt-5"
+                showsVerticalScrollIndicator={false}
+                style={styles.container}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={() => fetchProfile(true)} />
+                }
+            >
                 {/* --- HEADER AND PROFILE INFO --- */}
                 <View className="items-center pt-10 pb-6">
                     {/* Profile Picture */}
                     {profile.profile_photo ? (
                         <Image
-                            source={{ uri: getProfilePhotoUrl(profile.profile_photo) }}
+                            source={{ uri: renderAPIImage(profile.profile_photo) }}
                             className="w-24 h-24 rounded-full border-4 border-white shadow-md mb-4"
                             style={{ width: 96, height: 96, borderRadius: 48, marginBottom: 16 }}
                         />
@@ -92,6 +113,7 @@ const ProfileScreen: React.FC = () => {
                         <ProfileRow iconName="person-outline" title="Name" value={profile.name} />
                         <ProfileRow iconName="at-outline" title="Email" value={profile.email} />
                         <ProfileRow iconName="call-outline" title="Phone" value={profile.phone} />
+                        <ProfileRow iconName="reader-outline" title="Roll Number" value={profile.gr_no} />
                         <ProfileRow iconName="school-outline" title="User Type" value={profile.user_type} />
                     </View>
                     {/* Section 2: ACTIONS AND LOGOUT */}

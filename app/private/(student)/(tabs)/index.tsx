@@ -25,6 +25,7 @@ import {
   getFaceEmbedding,
   loadEmbedding,
   compareEmbeddings,
+  renderAPIImage,
 } from '~/lib/ImageChecker'; // <<< ADDED (Assuming path)
 import { fetchFromAPI } from '~/lib/api';
 import { getSocket, disconnectSocket } from '~/lib/socket';
@@ -397,15 +398,6 @@ const StudentHomeScreen: React.FC = () => {
   };
   // --- END ADDED ---
 
-  // Helper to fix local photo URL if needed
-  const getProfilePhotoUrl = (url?: string | null) => {
-    if (!url) return undefined;
-    if (url.startsWith('http://127.0.0.1:8000')) {
-      return url.replace('http://127.0.0.1:8000', 'https://d7e21c34a21f.ngrok-free.app');
-    }
-    return url;
-  };
-
   // --- Helper to fetch history (for refresh after marking) ---
   const fetchHistory = async () => {
     const res = await fetchFromAPI<{ records: AttendanceRecord[] }>('/students/history');
@@ -449,27 +441,27 @@ const StudentHomeScreen: React.FC = () => {
         >
           {/* Header (Greeting & Settings Icon) */}
           <View className="w-full flex-row justify-between items-center py-4 mt-8">
-                      {profile && profile.profile_photo ? (
-            <Image
-              source={{ uri: getProfilePhotoUrl(profile.profile_photo) }}
-              className="w-24 h-24 rounded-full border-4 border-white shadow-md mb-2"
-              style={{ width: 96, height: 96, borderRadius: 48, marginBottom: 8 }}
-            />
-          ) : (
-            <View className="w-24 h-24 rounded-full bg-gray-300 border-4 border-white shadow-md mb-2" />
-          )}
+            {profile && profile.profile_photo ? (
+              <Image
+                source={{ uri: renderAPIImage(profile.profile_photo) }}
+                className="w-24 h-24 rounded-full border-4 border-white shadow-md mb-2"
+                style={{ width: 64, height: 64, borderRadius: 48, marginBottom: 8 }}
+              />
+            ) : (
+              <View className="w-24 h-24 rounded-full bg-gray-300 border-4 border-white shadow-md mb-2" />
+            )}
             <View className="flex-1 ml-4">
               <Text
-                className="text-lg text-gray-600 mb-0"
+                className="text-md text-gray-600 mb-0"
                 style={{ fontFamily: 'Poppins_400Regular' }}
               >
                 Good Morning,
               </Text>
               <Text
-                className="text-2xl text-gray-900"
+                className="text-xl text-gray-900"
                 style={{ fontFamily: 'Poppins_600SemiBold' }}
               >
-                            {profile?.name || 'Student'}
+                {profile?.name || 'Student'}
               </Text>
             </View>
             <TouchableOpacity className="p-2 border border-gray-300 rounded-full">
@@ -654,18 +646,17 @@ const StudentHomeScreen: React.FC = () => {
                 <TouchableOpacity
                   onPress={handleCaptureAndVerify}
                   disabled={isProcessing || !registeredUser}
-                  className={`w-full h-12 rounded-lg items-center justify-center shadow-lg ${
-                    isProcessing || !registeredUser
+                  className={`w-full h-12 rounded-lg items-center justify-center shadow-lg ${isProcessing || !registeredUser
                       ? 'bg-gray-400'
                       : 'bg-[#0095FF]'
-                  }`}
+                    }`}
                 >
                   <Text className="text-xl font-bold text-white">
                     {isProcessing
                       ? 'Verifying...'
                       : !registeredUser
-                      ? 'No User Found'
-                      : 'Verify'}
+                        ? 'No User Found'
+                        : 'Verify'}
                   </Text>
                 </TouchableOpacity>
               )}

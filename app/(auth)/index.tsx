@@ -216,6 +216,17 @@ export const LoginScreen = () => {
             onPress={handleSubmit(onSubmitStatic)}
             className="mt-9 h-12 py-2 bg-[#1E90FF] rounded-lg"
           />
+
+          <View className="flex-row justify-center items-center mt-5">
+            <Text className="text-gray-600 text-sm" style={{ fontFamily: 'Poppins_400Regular' }}>
+              New to EduSync?{' '}
+            </Text>
+            <TouchableOpacity onPress={() => router.push('/register')}>
+              <Text className="text-[#1E90FF] text-sm font-semibold" style={{ fontFamily: 'Poppins_600SemiBold' }}>
+                Register now
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
 
