@@ -21,8 +21,6 @@ import androidx.core.os.bundleOf
 import android.bluetooth.*
 import android.bluetooth.le.*
 import java.util.UUID
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 
 class ExpoBleCoreModule : Module() {
 
@@ -50,7 +48,6 @@ class ExpoBleCoreModule : Module() {
   private var scanClassId: String? = null
   private var scanCallback: ScanCallback? = null
   
-  // CHANGED: Store by String ID now
   private val discoveredStudents = mutableMapOf<String, StudentInfo>()
   private val discoveredDeviceAddresses = mutableSetOf<String>()
   
@@ -64,7 +61,7 @@ class ExpoBleCoreModule : Module() {
   private var bluetoothStateReceiver: BroadcastReceiver? = null
 
   data class StudentInfo(
-    val studentId: String, // CHANGED: Now String
+    val studentId: String,
     val deviceAddress: String,
     val rssi: Int,
     val discoveredAt: Long,
@@ -76,16 +73,34 @@ class ExpoBleCoreModule : Module() {
     Name("ExpoBleCore")
 
     OnCreate {
-      android.util.Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-      android.util.Log.d(TAG, "🚀 Android Module Initialized (FIXED - iOS Compatible)")
-      android.util.Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+      android.util.Log.w(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+      android.util.Log.w(TAG, "🚀 MODULE LOADED: REFERENCE CODE PATTERNS")
+      android.util.Log.w(TAG, "   - NULL filter mode (not emptyList)")
+      android.util.Log.w(TAG, "   - ALL manufacturer IDs checked")
+      android.util.Log.w(TAG, "   - Ultra-verbose logging")
+      android.util.Log.w(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
       
       val activity = appContext.activityProvider?.currentActivity
       activity?.let {
         bluetoothManager = it.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
         bluetoothAdapter = bluetoothManager?.adapter
         alertHandler = Handler(Looper.getMainLooper())
-        android.util.Log.d(TAG, "Bluetooth Adapter: ${bluetoothAdapter != null}")
+        
+        android.util.Log.w(TAG, "Bluetooth Adapter: ${bluetoothAdapter != null}")
+        android.util.Log.w(TAG, "Bluetooth Enabled: ${bluetoothAdapter?.isEnabled}")
+        
+        // CRITICAL: Check location services
+        val locationManager = it.getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager
+        val isLocationEnabled = locationManager?.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) == true ||
+                               locationManager?.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER) == true
+        
+        if (!isLocationEnabled) {
+          android.util.Log.e(TAG, "❌❌❌ LOCATION SERVICES ARE OFF ❌❌❌")
+          android.util.Log.e(TAG, "BLE scanning will return 0 results!")
+          android.util.Log.e(TAG, "Enable GPS in Quick Settings!")
+        } else {
+          android.util.Log.w(TAG, "✓ Location services enabled")
+        }
       }
     }
 
@@ -166,12 +181,17 @@ class ExpoBleCoreModule : Module() {
       return@Function true
     }
 
-    // ============== TEACHER FUNCTIONS ==============
+    // ============== TEACHER FUNCTIONS (REFERENCE CODE PATTERN) ==============
     
     AsyncFunction("startStudentScan") { classId: String, promise: Promise ->
-      android.util.Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-      android.util.Log.d(TAG, "🔵 START STUDENT SCAN (Android Teacher)")
-      android.util.Log.d(TAG, "   ClassID Prefix: '$classId'")
+      android.util.Log.w(TAG, "")
+      android.util.Log.w(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+      android.util.Log.w(TAG, "🔵 START SCAN (REFERENCE CODE PATTERN)")
+      android.util.Log.w(TAG, "   ClassID Filter: '$classId'")
+      android.util.Log.w(TAG, "   🔑 KEY FIX: Using NULL filter (not emptyList)")
+      android.util.Log.w(TAG, "   🔑 KEY FIX: Checking ALL manufacturer IDs")
+      android.util.Log.w(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+      android.util.Log.w(TAG, "")
       
       val activity = appContext.activityProvider?.currentActivity
       if (activity == null) {
@@ -192,6 +212,19 @@ class ExpoBleCoreModule : Module() {
         return@AsyncFunction
       }
 
+      // Check location services
+      val locationManager = activity.getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager
+      val isLocationEnabled = locationManager?.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) == true ||
+                             locationManager?.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER) == true
+      
+      if (!isLocationEnabled) {
+        android.util.Log.e(TAG, "❌❌❌ LOCATION/GPS IS OFF ❌❌❌")
+        android.util.Log.e(TAG, "Android requires Location to be ON for BLE scanning!")
+        android.util.Log.e(TAG, "Please enable Location in Quick Settings")
+        promise.resolve(mapOf("success" to false, "error" to "Location services disabled"))
+        return@AsyncFunction
+      }
+
       if (isScanning) {
         android.util.Log.w(TAG, "⚠️ Already scanning")
         promise.resolve(mapOf("success" to false, "error" to "Already scanning"))
@@ -206,6 +239,8 @@ class ExpoBleCoreModule : Module() {
       }
 
       scanClassId = classId
+      discoveredStudents.clear()
+      discoveredDeviceAddresses.clear()
 
       scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult?) {
@@ -217,9 +252,15 @@ class ExpoBleCoreModule : Module() {
         }
 
         override fun onScanFailed(errorCode: Int) {
-          android.util.Log.e(TAG, "❌ Scan failed: error $errorCode")
+          val errorMsg = when(errorCode) {
+            SCAN_FAILED_ALREADY_STARTED -> "Already started"
+            SCAN_FAILED_APPLICATION_REGISTRATION_FAILED -> "App registration failed"
+            SCAN_FAILED_INTERNAL_ERROR -> "Internal error"
+            SCAN_FAILED_FEATURE_UNSUPPORTED -> "Feature unsupported"
+            else -> "Unknown error: $errorCode"
+          }
+          android.util.Log.e(TAG, "❌ Scan failed: $errorMsg (code: $errorCode)")
           isScanning = false
-          sendEvent("onStudentDiscovered", mapOf("error" to true, "errorCode" to errorCode))
         }
       }
 
@@ -228,27 +269,22 @@ class ExpoBleCoreModule : Module() {
         .setReportDelay(0)
         .build()
 
-      // Filter by service UUID
-      val scanFilters = listOf(
-        ScanFilter.Builder()
-          .setServiceUuid(ParcelUuid.fromString(ATTENDANCE_SERVICE_UUID))
-          .build()
-      )
-
-      android.util.Log.d(TAG, "   Service Filter: $ATTENDANCE_SERVICE_UUID")
-      android.util.Log.d(TAG, "   Looking for LocalName field in advertisements")
-
+      // ✅✅✅ CRITICAL FIX FROM REFERENCE CODE ✅✅✅
+      // Use NULL instead of emptyList() - this is the TRUE wildcard on Android
+      // Reference: santansarah/ble-scanner BleManager.kt line ~150
       try {
-        bluetoothLeScanner?.startScan(scanFilters, scanSettings, scanCallback)
+        bluetoothLeScanner?.startScan(null, scanSettings, scanCallback)
         isScanning = true
-        android.util.Log.i(TAG, "✅ Service-filtered scan started")
-        android.util.Log.i(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        android.util.Log.w(TAG, "✅✅✅ SCAN STARTED WITH NULL FILTER ✅✅✅")
+        android.util.Log.w(TAG, "Listening for ALL BLE advertisements...")
+        android.util.Log.w(TAG, "")
         promise.resolve(mapOf("success" to true))
       } catch (e: SecurityException) {
         android.util.Log.e(TAG, "❌ Security exception: ${e.message}")
         promise.resolve(mapOf("success" to false, "error" to "Security exception"))
       } catch (e: Exception) {
         android.util.Log.e(TAG, "❌ Exception: ${e.message}")
+        e.printStackTrace()
         promise.resolve(mapOf("success" to false, "error" to e.message))
       }
     }
@@ -289,10 +325,9 @@ class ExpoBleCoreModule : Module() {
 
     // ============== STUDENT FUNCTIONS ==============
     
-    // ✅ FIXED: Use LocalName (iOS-compatible strategy)
     AsyncFunction("checkIn") { combinedId: String, promise: Promise ->
       android.util.Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-      android.util.Log.d(TAG, "📢 CHECK-IN (Android - iOS Compatible)")
+      android.util.Log.d(TAG, "📢 CHECK-IN (Android Student)")
       android.util.Log.d(TAG, "   Combined ID: '$combinedId'")
 
       if (combinedId.length > 8) {
@@ -308,19 +343,18 @@ class ExpoBleCoreModule : Module() {
           return@AsyncFunction
       }
 
-      // Setup GATT Server (Required for alert receiving)
+      // Setup GATT Server
       val activity = appContext.activityProvider?.currentActivity
       if (activity != null) setupGattServer(activity)
 
-      // ✅ CRITICAL FIX: Use LocalName instead of Manufacturer Data
-      // This matches iOS advertising strategy!
+      // Advertise with Service UUID in main packet
       val advertiseData = AdvertiseData.Builder()
         .addServiceUuid(ParcelUuid.fromString(ATTENDANCE_SERVICE_UUID))
-        .setIncludeDeviceName(false) // Don't use real device name
+        .setIncludeDeviceName(false)
         .setIncludeTxPowerLevel(false)
         .build()
 
-      // ✅ CRITICAL: Put the ID in the SCAN RESPONSE as LocalName
+      // Put student ID in scan response as Manufacturer Data
       val scanResponse = AdvertiseData.Builder()
         .setIncludeDeviceName(false)
         .setIncludeTxPowerLevel(false)
@@ -331,7 +365,7 @@ class ExpoBleCoreModule : Module() {
         .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
         .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
         .setConnectable(true)
-        .setTimeout(0) // No timeout
+        .setTimeout(0)
         .build()
 
       advertiseCallback = object : AdvertiseCallback() {
@@ -339,7 +373,7 @@ class ExpoBleCoreModule : Module() {
           android.util.Log.i(TAG, "✅ Advertising Success!")
           android.util.Log.i(TAG, "   Broadcasting: '$combinedId'")
           android.util.Log.i(TAG, "   Service UUID: $ATTENDANCE_SERVICE_UUID")
-          android.util.Log.i(TAG, "   Format: iOS-compatible (ManufacturerData in scan response)")
+          android.util.Log.i(TAG, "   Format: ManufacturerData(0xFFFF) in scan response")
           isAdvertising = true
           currentCombinedId = combinedId
           checkInTimestamp = System.currentTimeMillis()
@@ -414,7 +448,7 @@ class ExpoBleCoreModule : Module() {
     
     Function("isAlertRolloutActive") { return@Function isAlertRolloutActive }
     
-    Function("markStudentVerified") { studentId: String -> // CHANGED: String parameter
+    Function("markStudentVerified") { studentId: String ->
       discoveredStudents[studentId]?.let {
         it.verified = true
         it.verifiedAt = System.currentTimeMillis()
@@ -437,98 +471,114 @@ class ExpoBleCoreModule : Module() {
     }
   }
 
-  // ============== HELPER FUNCTIONS ==============
+  // ============== PARSING LOGIC (REFERENCE CODE PATTERN) ==============
   
   private fun processScanResult(result: ScanResult) {
     val scanRecord = result.scanRecord ?: return
     val device = result.device
     val rssi = result.rssi
     
-    android.util.Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    android.util.Log.d(TAG, "📱 DEVICE DISCOVERED")
-    android.util.Log.d(TAG, "   Device: ${device.address}")
-    android.util.Log.d(TAG, "   RSSI: $rssi dBm")
+    val deviceName = scanRecord.deviceName
+    val uuids = scanRecord.serviceUuids?.map { it.uuid.toString() } ?: emptyList()
+    
+    // ✅ CRITICAL FIX FROM REFERENCE CODE ✅
+    // Check ALL manufacturer IDs, not just 0xFFFF
+    // Reference: santansarah/ble-scanner ParseScanResult.kt
+    val manufDataMap = scanRecord.manufacturerSpecificData
+    
+    // Log every device we see
+    android.util.Log.w(TAG, "━━━ DEVICE ━━━")
+    android.util.Log.w(TAG, "Addr: ${device.address}")
+    android.util.Log.w(TAG, "Name: '${deviceName ?: "null"}'")
+    android.util.Log.w(TAG, "RSSI: $rssi")
+    android.util.Log.w(TAG, "UUIDs: $uuids")
     
     var studentLabel: String? = null
+    var detectionMethod = ""
 
-    // Strategy 1: Check device name (LocalName)
-    scanRecord.deviceName?.let { name ->
-      android.util.Log.d(TAG, "   ✓ LocalName: '$name'")
-      studentLabel = name
-    }
-
-    // Strategy 2: Check manufacturer data
-    if (studentLabel == null) {
-      scanRecord.getManufacturerSpecificData(MANUFACTURER_ID)?.let { bytes ->
-        android.util.Log.d(TAG, "   ✓ Manufacturer data: ${bytes.size} bytes")
-        android.util.Log.d(TAG, "     Hex: ${bytes.joinToString(" ") { "%02X".format(it) }}")
-        try {
-          val decoded = String(bytes, Charsets.UTF_8)
-          android.util.Log.d(TAG, "     Decoded: '$decoded'")
-          studentLabel = decoded
-        } catch (e: Exception) {
-          android.util.Log.e(TAG, "     ✗ Decode error: ${e.message}")
+    // Strategy 1: LocalName (iOS students)
+    if (!deviceName.isNullOrBlank()) {
+        android.util.Log.i(TAG, "→ LocalName: '$deviceName'")
+        
+        if (deviceName.length <= 8 && deviceName.matches(Regex("^[A-Za-z0-9]+$"))) {
+            android.util.Log.i(TAG, "  ✓ Valid format")
+            
+            if (scanClassId.isNullOrBlank() || deviceName.startsWith(scanClassId!!)) {
+                studentLabel = deviceName
+                detectionMethod = "LocalName (iOS)"
+                android.util.Log.w(TAG, "  ✅ MATCH!")
+            } else {
+                android.util.Log.d(TAG, "  ✗ Prefix mismatch")
+            }
+        } else {
+            android.util.Log.d(TAG, "  ✗ Invalid format")
         }
-      }
     }
 
-    // Strategy 3: Check service data
-    if (studentLabel == null) {
-      val serviceUuid = ParcelUuid.fromString(ATTENDANCE_SERVICE_UUID)
-      scanRecord.getServiceData(serviceUuid)?.let { bytes ->
-        android.util.Log.d(TAG, "   ✓ Service data: ${bytes.size} bytes")
-        try {
-          val decoded = String(bytes, Charsets.UTF_8)
-          android.util.Log.d(TAG, "     Decoded: '$decoded'")
-          studentLabel = decoded
-        } catch (e: Exception) {
-          android.util.Log.e(TAG, "     ✗ Decode error: ${e.message}")
+    // Strategy 2: Manufacturer Data (Android students)
+    // ✅✅✅ ITERATE THROUGH ALL MANUFACTURER IDs ✅✅✅
+    if (studentLabel == null && manufDataMap != null && manufDataMap.size() > 0) {
+        android.util.Log.i(TAG, "→ Manufacturer Data: ${manufDataMap.size()} entries")
+        
+        for (i in 0 until manufDataMap.size()) {
+            val manufId = manufDataMap.keyAt(i)
+            val manufBytes = manufDataMap.valueAt(i)
+            
+            val hexStr = manufBytes.joinToString(" ") { "%02X".format(it) }
+            android.util.Log.i(TAG, "  [0x${manufId.toString(16).uppercase()}]: $hexStr")
+            
+            try {
+                val decoded = String(manufBytes, Charsets.UTF_8).trim()
+                android.util.Log.i(TAG, "    Decoded: '$decoded'")
+                
+                if (decoded.length <= 8 && decoded.matches(Regex("^[A-Za-z0-9]+$"))) {
+                    if (scanClassId.isNullOrBlank() || decoded.startsWith(scanClassId!!)) {
+                        studentLabel = decoded
+                        detectionMethod = "ManufData [0x${manufId.toString(16).uppercase()}]"
+                        android.util.Log.w(TAG, "    ✅ MATCH!")
+                        break
+                    } else {
+                        android.util.Log.d(TAG, "    ✗ Prefix mismatch")
+                    }
+                } else {
+                    android.util.Log.d(TAG, "    ✗ Invalid format")
+                }
+            } catch (e: Exception) {
+                android.util.Log.d(TAG, "    ✗ Decode error: ${e.message}")
+            }
         }
-      }
+    } else if (studentLabel == null) {
+        android.util.Log.d(TAG, "→ No manufacturer data")
     }
 
-    if (studentLabel == null) {
-      android.util.Log.w(TAG, "   ⚠️ No student ID found in advertisement")
-      android.util.Log.w(TAG, "   Available fields:")
-      android.util.Log.w(TAG, "     - DeviceName: ${scanRecord.deviceName}")
-      android.util.Log.w(TAG, "     - ServiceUUIDs: ${scanRecord.serviceUuids}")
-      android.util.Log.w(TAG, "     - ManufacturerData: ${scanRecord.getManufacturerSpecificData(MANUFACTURER_ID) != null}")
-      android.util.Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-      return
-    }
-
-    // Filter by class prefix
-    if (scanClassId != null && !studentLabel!!.startsWith(scanClassId!!)) {
-      android.util.Log.d(TAG, "   ⏩ Class mismatch: '$studentLabel' doesn't start with '$scanClassId'")
-      android.util.Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-      return
-    }
-
-    // Add student
-    if (!discoveredStudents.containsKey(studentLabel)) {
-      android.util.Log.i(TAG, "   🎉 ✅ NEW STUDENT DISCOVERED!")
-      android.util.Log.i(TAG, "      StudentID: $studentLabel")
-      android.util.Log.i(TAG, "      Class Prefix: $scanClassId")
-      
-      val info = StudentInfo(
-        studentLabel!!,
-        device.address,
-        rssi,
-        System.currentTimeMillis()
-      )
-      discoveredStudents[studentLabel!!] = info
-      
-      sendEvent("onStudentDiscovered", bundleOf(
-        "studentId" to studentLabel,
-        "deviceAddress" to device.address,
-        "rssi" to rssi,
-        "classId" to studentLabel
-      ))
+    // Report discovery
+    if (studentLabel != null) {
+        if (!discoveredStudents.containsKey(studentLabel)) {
+            android.util.Log.w(TAG, "")
+            android.util.Log.w(TAG, "🎉🎉🎉 NEW STUDENT 🎉🎉🎉")
+            android.util.Log.w(TAG, "   ID: '$studentLabel'")
+            android.util.Log.w(TAG, "   Addr: ${device.address}")
+            android.util.Log.w(TAG, "   RSSI: $rssi")
+            android.util.Log.w(TAG, "   Via: $detectionMethod")
+            android.util.Log.w(TAG, "")
+            
+            val info = StudentInfo(studentLabel, device.address, rssi, System.currentTimeMillis())
+            discoveredStudents[studentLabel] = info
+            
+            sendEvent("onStudentDiscovered", bundleOf(
+                "studentId" to studentLabel,
+                "deviceAddress" to device.address,
+                "rssi" to rssi,
+                "classId" to studentLabel
+            ))
+        } else {
+            android.util.Log.v(TAG, "ℹ️ Already known: '$studentLabel'")
+        }
     } else {
-      android.util.Log.d(TAG, "   ℹ️ Already discovered: $studentLabel")
+        android.util.Log.d(TAG, "❌ Not a student device")
     }
-    
-    android.util.Log.d(TAG, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    android.util.Log.w(TAG, "━━━━━━━━━━━━━━━━━━━━")
+    android.util.Log.w(TAG, "")
   }
 
   private fun setupGattServer(context: Context): Boolean {

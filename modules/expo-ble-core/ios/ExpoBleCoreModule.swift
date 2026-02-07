@@ -92,7 +92,7 @@ public class ExpoBleCoreModule: Module {
 
     OnCreate {
       self.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-      self.log("🚀 iOS MODULE INITIALIZED (FIXED - Manufacturer Data Parsing)")
+      self.log("🚀 iOS MODULE INITIALIZED (CROSS-PLATFORM COMPATIBLE)")
       self.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
       
       // Create delegate handler
@@ -186,9 +186,10 @@ public class ExpoBleCoreModule: Module {
           let state = self.centralManager.state
           
           self.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-          self.log("🔵 START STUDENT SCAN")
+          self.log("🔵 START STUDENT SCAN (iOS Teacher)")
           self.log("   Prefix Filter: '\(classPrefix)'")
           self.log("   Service UUID: \(self.ATTENDANCE_SERVICE_UUID.uuidString)")
+          self.log("   Strategy: LocalName (iOS) + ManufacturerData (Android)")
           
           guard state == .poweredOn else {
             let errorMsg = "Bluetooth not ready (state: \(self.stateString(state)))"
@@ -356,7 +357,7 @@ public class ExpoBleCoreModule: Module {
     AsyncFunction("checkIn") { (combinedId: String, promise: Promise) in
       self.bleQueue.async {
           self.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-          self.log("📍 CHECK-IN (iOS)")
+          self.log("📍 CHECK-IN (iOS Student)")
           self.log("   ID: '\(combinedId)'")
           
           guard self.peripheralManager.state == .poweredOn else {
@@ -396,18 +397,25 @@ public class ExpoBleCoreModule: Module {
           self.peripheralManager.removeAllServices()
           self.peripheralManager.add(service)
           
-          // Advertise ID as Local Name
-          self.log("📢 Advertising '\(combinedId)'...")
+          // ✅ CRITICAL: iOS can ONLY advertise via LocalName
+          // iOS does NOT support Service Data in peripheral mode
+          // Android teachers MUST read the LocalName field
+          self.log("📢 Advertising configuration:")
+          self.log("   - Service UUID: \(self.ATTENDANCE_SERVICE_UUID.uuidString)")
+          self.log("   - Local Name: '\(combinedId)' (cross-platform)")
+          self.log("   - Note: iOS cannot use Service Data (platform limitation)")
           
-          self.peripheralManager.startAdvertising([
+          let advData: [String: Any] = [
             CBAdvertisementDataServiceUUIDsKey: [self.ATTENDANCE_SERVICE_UUID],
             CBAdvertisementDataLocalNameKey: combinedId
-          ])
+          ]
+          
+          self.peripheralManager.startAdvertising(advData)
           
           self.isAdvertising = true
           self.checkInTimestamp = Date().timeIntervalSince1970 * 1000
           
-          self.log("✅ Success")
+          self.log("✅ Advertising started (LocalName mode)")
           promise.resolve(["success": true])
       }
     }
@@ -435,7 +443,7 @@ public class ExpoBleCoreModule: Module {
     }
   }
   
-  // ============== DELEGATE METHODS (FIXED MANUFACTURER DATA PARSING) ==============
+  // ============== DELEGATE METHODS ==============
   
   func centralManagerDidUpdateState(_ central: CBCentralManager) {
     self.log("📱 Central State: \(self.stateString(central.state))")
@@ -445,45 +453,63 @@ public class ExpoBleCoreModule: Module {
   func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
     guard self.isScanning else { return }
     
+    self.log("━━━━ ADVERTISEMENT RECEIVED ━━━━")
+    self.log("Peripheral: \(peripheral.identifier.uuidString)")
+    self.log("RSSI: \(RSSI)")
+    
     var studentLabel: String?
     
-    // 1. Check Manufacturer Data (Android) - FIXED to skip 2-byte manufacturer ID
-    if let manufData = advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data {
+    // Strategy 1: Check LocalName (iOS students advertise here)
+    if let localName = advertisementData[CBAdvertisementDataLocalNameKey] as? String {
+        self.log("✓ Local Name: '\(localName)'")
+        if localName.matches("^[A-Za-z0-9]+$") && localName.count <= 8 {
+            studentLabel = localName
+            self.log("  → Accepted as Student ID")
+        } else {
+            self.log("  → Rejected (invalid format)")
+        }
+    } else {
+        self.log("✗ No Local Name")
+    }
+    
+    // Strategy 2: Check Manufacturer Data (Android students advertise here)
+    if studentLabel == nil, let manufData = advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data {
         self.log("✓ Manufacturer Data: \(manufData.count) bytes")
         self.log("  Hex: \(manufData.map { String(format: "%02X", $0) }.joined(separator: " "))")
         
-        // CRITICAL FIX: Skip first 2 bytes (manufacturer ID = 0xFFFF)
-        // Format: [0xFF, 0xFF, ...actual student ID bytes...]
+        // Android format: [0xFF, 0xFF, ...student ID bytes...]
+        // iOS receives this as-is (with the 2-byte manufacturer ID prefix)
         if manufData.count > 2 {
             let actualData = manufData.subdata(in: 2..<manufData.count)
             if let str = String(data: actualData, encoding: .utf8) {
-                 self.log("  Decoded: '\(str)' (skipped 2-byte ID prefix)")
-                 studentLabel = str
+                 self.log("  Decoded: '\(str)' (skipped 2-byte prefix)")
+                 if str.matches("^[A-Za-z0-9]+$") && str.count <= 8 {
+                     studentLabel = str
+                     self.log("  → Accepted as Student ID")
+                 } else {
+                     self.log("  → Rejected (invalid format)")
+                 }
             } else {
                 self.log("  ✗ Failed UTF-8 decode")
             }
         } else {
             self.log("  ✗ Data too short")
         }
+    } else if studentLabel == nil {
+        self.log("✗ No Manufacturer Data")
     }
     
-    // 2. Check Local Name (iOS)
-    if studentLabel == nil, let localName = advertisementData[CBAdvertisementDataLocalNameKey] as? String {
-        self.log("✓ Local Name: '\(localName)'")
-        studentLabel = localName
-    }
-    
-    // 3. Process Finding
+    // Process result
     if let label = studentLabel {
         // Filter by prefix
         if let prefix = self.scanClassId, !label.hasPrefix(prefix) {
-            self.log("⏩ Ignored: '\(label)' (prefix mismatch)")
+            self.log("⏩ Ignored: '\(label)' (prefix mismatch, expected '\(prefix)')")
             return
         }
         
         // De-duplication
         if !self.discoveredLabels.contains(label) {
-            self.log("✅ FOUND: \(label) (RSSI: \(RSSI))")
+            self.log("✅ NEW STUDENT FOUND: \(label) (RSSI: \(RSSI))")
             
             self.discoveredLabels.insert(label)
             self.discoveredPeripherals[peripheral.identifier.uuidString] = peripheral
@@ -497,14 +523,19 @@ public class ExpoBleCoreModule: Module {
                 "discoveredAt": Date().timeIntervalSince1970 * 1000
             ]
             
-            // Send RAW data to JS
+            // Send to JS
             self.sendEvent("onStudentDiscovered", [
                 "studentId": label,
                 "deviceAddress": peripheral.identifier.uuidString,
                 "rssi": RSSI,
                 "classId": label
             ])
+        } else {
+            self.log("ℹ️  Already discovered: \(label)")
         }
+    } else {
+        self.log("⚠️  No student ID found in advertisement")
+        self.log("Available fields: \(advertisementData.keys)")
     }
   }
   
@@ -635,5 +666,12 @@ public class ExpoBleCoreModule: Module {
     case .allowedAlways: return "AllowedAlways"
     @unknown default: return "Unknown(\(auth.rawValue))"
     }
+  }
+}
+
+// String extension for regex matching
+extension String {
+  func matches(_ pattern: String) -> Bool {
+    return range(of: pattern, options: .regularExpression) != nil
   }
 }
