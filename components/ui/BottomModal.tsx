@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from "react";
-import { View, StyleSheet, useWindowDimensions, Dimensions } from "react-native";
+import { View, StyleSheet, useWindowDimensions, Dimensions, ScrollView } from "react-native";
 import Modal from "react-native-modal";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -24,11 +24,8 @@ const styles = StyleSheet.create({
     },
     modalContent: {
         backgroundColor: "white",
-        paddingTop: 12,
-        paddingHorizontal: 12,
         borderTopRightRadius: 16,
         borderTopLeftRadius: 16,
-        paddingBottom: 20,
         shadowColor: "#000",
         shadowOffset: {
             width: 0,
@@ -36,13 +33,20 @@ const styles = StyleSheet.create({
         },
         shadowOpacity: 0.25,
         shadowRadius: 3.84,
-        overflow: "hidden",
+    },
+    scrollView: {
+        flex: 1,
+    },
+    scrollContent: {
+        paddingHorizontal: 12,
+        paddingBottom: 20,
     },
     handleBarWrapper: {
         alignSelf: "stretch",
         alignItems: "center",
         paddingVertical: 12,
         marginBottom: 4,
+        paddingHorizontal: 12,
     },
     barIcon: {
         width: 48,
@@ -106,6 +110,7 @@ export const BottomModal: React.FC<BottomModalProps> = ({ isVisible, onClose, ch
 
     const animatedContentStyle = useAnimatedStyle(() => ({
         height: sheetHeight.value,
+        overflow: "hidden",
     }));
 
     return (
@@ -122,18 +127,27 @@ export const BottomModal: React.FC<BottomModalProps> = ({ isVisible, onClose, ch
             backdropTransitionOutTiming={300}
             useNativeDriver={false}
             hideModalContentWhileAnimating={false}
-            propagateSwipe={true}
+            propagateSwipe={false}
             style={styles.modal}
             avoidKeyboard
         >
             <Animated.View style={[styles.modalContent, animatedContentStyle]}>
-                {/* Handle Bar only - drag here to expand/shrink; list area scrolls normally */}
+                {/* Handle Bar - drag to expand/shrink */}
                 <GestureDetector gesture={pan}>
                     <View style={styles.handleBarWrapper}>
                         <View style={styles.barIcon} />
                     </View>
                 </GestureDetector>
-                {children}
+                {/* Scrollable content */}
+                <ScrollView
+                    style={styles.scrollView}
+                    contentContainerStyle={styles.scrollContent}
+                    scrollEnabled={true}
+                    nestedScrollEnabled={true}
+                    showsVerticalScrollIndicator={false}
+                >
+                    {children}
+                </ScrollView>
             </Animated.View>
         </Modal>
     );

@@ -11,7 +11,7 @@ import {
   Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
+// import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import { InputField } from '~/components/ui/Input';
 import { Button } from '~/components/ui/Button';
 import { getFaceEmbedding, saveEmbedding } from '~/lib/ImageChecker';
@@ -79,15 +79,15 @@ export default function StudentRegistrationScreen() {
   const [capturedImageUri, setCapturedImageUri] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [embeddingSaved, setEmbeddingSaved] = useState(false);
-  const camera = useRef<Camera>(null);
-  const device = useCameraDevice('front');
-  const { hasPermission, requestPermission } = useCameraPermission();
+  // const camera = useRef<Camera>(null);
+  // const device = useCameraDevice('front');
+  // const { hasPermission, requestPermission } = useCameraPermission();
 
-  useEffect(() => {
-    if (currentStep === 3 && !hasPermission) {
-      requestPermission();
-    }
-  }, [currentStep]);
+  // useEffect(() => {
+  //   if (currentStep === 3 && !hasPermission) {
+  //     requestPermission();
+  //   }
+  // }, [currentStep]);
 
   const handleNext = () => {
     // Validation for step 1
@@ -122,25 +122,25 @@ export default function StudentRegistrationScreen() {
   };
 
   const captureAndProcess = async () => {
-    if (!camera.current) {
-      Alert.alert('Error', 'Camera not ready');
-      return;
-    }
+    // if (!camera.current) {
+    //   Alert.alert('Error', 'Camera not ready');
+    //   return;
+    // }
 
     try {
       setIsProcessing(true);
       
-      // Take photo
-      const photo = await camera.current.takePhoto({
-        flash: 'off',
-        enableShutterSound: false,
-      });
+      // // Take photo
+      // const photo = await camera.current.takePhoto({
+      //   flash: 'off',
+      //   enableShutterSound: false,
+      // });
 
-      const photoUri = `file://${photo.path}`;
-      setCapturedImageUri(photoUri);
+      // const photoUri = `file://${photo.path}`;
+      // setCapturedImageUri(photoUri);
 
-      // Generate face embedding
-      const { embedding } = await getFaceEmbedding(photoUri);
+      // // Generate face embedding
+      // const { embedding } = await getFaceEmbedding(photoUri);
 
       // Create unique identifier: "FullName - GRNumber"
       const userId = `${fullName.trim()} - ${grNumber.trim()}`;
@@ -385,30 +385,30 @@ export default function StudentRegistrationScreen() {
   );
 
   const renderFaceRegistration = () => {
-    if (!hasPermission) {
-      return (
-        <View className="flex-1 items-center justify-center py-24">
-          <Text className="text-base text-gray-500 mb-5 text-center" style={{ fontFamily: 'Poppins_400Regular' }}>
-            Camera permission is required
-          </Text>
-          <Button
-            title="Grant Permission"
-            onPress={requestPermission}
-            className="h-14 bg-[#1E90FF] rounded-xl justify-center items-center"
-          />
-        </View>
-      );
-    }
+    // if (!hasPermission) {
+    //   return (
+    //     <View className="flex-1 items-center justify-center py-24">
+    //       <Text className="text-base text-gray-500 mb-5 text-center" style={{ fontFamily: 'Poppins_400Regular' }}>
+    //         Camera permission is required
+    //       </Text>
+    //       <Button
+    //         title="Grant Permission"
+    //         onPress={requestPermission}
+    //         className="h-14 bg-[#1E90FF] rounded-xl justify-center items-center"
+    //       />
+    //     </View>
+    //   );
+    // }
 
-    if (!device) {
-      return (
-        <View className="flex-1 items-center justify-center py-24">
-          <Text className="text-base text-gray-500 text-center" style={{ fontFamily: 'Poppins_400Regular' }}>
-            No camera device found
-          </Text>
-        </View>
-      );
-    }
+    // if (!device) {
+    //   return (
+    //     <View className="flex-1 items-center justify-center py-24">
+    //       <Text className="text-base text-gray-500 text-center" style={{ fontFamily: 'Poppins_400Regular' }}>
+    //         No camera device found
+    //       </Text>
+    //     </View>
+    //   );
+    // }
 
     return (
       <>
@@ -431,13 +431,16 @@ export default function StudentRegistrationScreen() {
                 resizeMode="cover"
               />
             ) : (
-              <Camera
-                ref={camera}
-                style={{ width: '100%', height: '100%' }}
-                device={device}
-                isActive={currentStep === 3 && !capturedImageUri}
-                photo={true}
-              />
+              // <Camera
+              //   ref={camera}
+              //   style={{ width: '100%', height: '100%' }}
+              //   device={device}
+              //   isActive={currentStep === 3 && !capturedImageUri}
+              //   photo={true}
+              // />
+              <View className="w-full h-full bg-gray-300 items-center justify-center">
+                <Text className="text-gray-600">Camera not available in Expo Go</Text>
+              </View>
             )}
           </View>
           

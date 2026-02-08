@@ -1,0 +1,154 @@
+{
+  "todaysSessions": [
+    {
+      "id": 1,
+      "start_time": "2026-02-08T09:30:00",
+      "end_time": "2026-02-08T10:30:00",
+      "duration": "1:00:00",
+      "checked_in": true,
+      "checked_in_at": "2026-02-08T09:35:00",
+      "class": {
+        "id": 1,
+        "subject": "Data Structures",
+        "department": "CSE",
+        "year": "SEM 3-A"
+      },
+      "break_status": null
+    },
+    {
+      "id": 2,
+      "start_time": "2026-02-08T10:45:00",
+      "end_time": "2026-02-08T11:45:00",
+      "duration": "1:00:00",
+      "checked_in": true,
+      "checked_in_at": "2026-02-08T10:47:00",
+      "class": {
+        "id": 2,
+        "subject": "Web Development",
+        "department": "CSE",
+        "year": "SEM 3-A"
+      },
+      "break_status": {
+        "is_ongoing": true,
+        "duration": "0:15:00"
+      }
+    },
+    {
+      "id": 3,
+      "start_time": "2026-02-08T13:00:00",
+      "end_time": "2026-02-08T14:00:00",
+      "duration": "1:00:00",
+      "checked_in": false,
+      "checked_in_at": null,
+      "class": {
+        "id": 3,
+        "subject": "Database Management",
+        "department": "CSE",
+        "year": "SEM 3-A"
+      },
+      "break_status": null
+    }
+  ],
+  "ongoingLectures": [
+    {
+      "id": 1,
+      "subject": "Blockchain Lab",
+      "department": "CSE",
+      "code": "SEM7-A",
+      "classId": "1",
+      "startTime": "10:00 AM",
+      "endTime": "11:00 AM",
+      "isOngoing": true
+    }
+  ],
+  "upcomingLectures": [
+    {
+      "id": 2,
+      "subject": "Advanced Cryptography",
+      "department": "CSE",
+      "code": "SEM7-A",
+      "classId": "2",
+      "startTime": "11:15 AM",
+      "endTime": "12:15 PM",
+      "isOngoing": false
+    },
+    {
+      "id": 3,
+      "subject": "Smart Contracts Development",
+      "department": "CSE",
+      "code": "SEM7-A",
+      "classId": "3",
+      "startTime": "02:00 PM",
+      "endTime": "03:00 PM",
+      "isOngoing": false
+    },
+    {
+      "id": 4,
+      "subject": "Web3 Fundamentals",
+      "department": "CSE",
+      "code": "SEM7-A",
+      "classId": "4",
+      "startTime": "03:15 PM",
+      "endTime": "04:15 PM",
+      "isOngoing": false
+    }
+  ],
+  "classDetails": {
+    "1": {
+      "id": "1",
+      "subject": "Blockchain Lab",
+      "department": "CSE",
+      "code": "SEM7-A",
+      "instructor": "Dr. Rajesh Kumar",
+      "room": "Lab 5",
+      "startTime": "10:00 AM",
+      "endTime": "11:00 AM",
+      "date": "22 Oct 2025"
+    },
+    "2": {
+      "id": "2",
+      "subject": "Advanced Cryptography",
+      "department": "CSE",
+      "code": "SEM7-A",
+      "instructor": "Prof. Anita Singh",
+      "room": "Lecture Hall 3",
+      "startTime": "11:15 AM",
+      "endTime": "12:15 PM",
+      "date": "22 Oct 2025",
+      "description": "Advanced cryptographic algorithms, key management, and security protocols. Includes AES, RSA, and elliptic curve cryptography.",
+      "totalStudents": 45,
+      "presentStudents": 41,
+      "attendanceRate": 91.1
+    },
+    "3": {
+      "id": "3",
+      "subject": "Smart Contracts Development",
+      "department": "CSE",
+      "code": "SEM7-A",
+      "instructor": "Dr. Priya Sharma",
+      "room": "Lab 3",
+      "startTime": "02:00 PM",
+      "endTime": "03:00 PM",
+      "date": "22 Oct 2025",
+      "description": "Developing and deploying smart contracts on Ethereum. Topics cover contract design patterns, security best practices, and gas optimization.",
+      "totalStudents": 45,
+      "presentStudents": 39,
+      "attendanceRate": 86.7
+    },
+    "4": {
+      "id": "4",
+      "subject": "Web3 Fundamentals",
+      "department": "CSE",
+      "code": "SEM7-A",
+      "instructor": "Mr. Vikram Patel",
+      "room": "Lecture Hall 2",
+      "startTime": "03:15 PM",
+      "endTime": "04:15 PM",
+      "date": "22 Oct 2025",
+      "description": "Introduction to Web3 technologies, decentralized systems, and DeFi concepts. Learn about wallets, tokens, and decentralized finance.",
+      "totalStudents": 45,
+      "presentStudents": 37,
+      "attendanceRate": 82.2
+    }
+  }
+}
