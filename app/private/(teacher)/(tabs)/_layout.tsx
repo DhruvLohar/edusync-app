@@ -45,34 +45,12 @@ export default function TabLayout() {
 
       {/* Center Floating Tab (now truly centered) */}
       <Tabs.Screen
-        name="add"
+        name="[class_id]"
         options={{
-          title: "Add",
-          tabBarButton: (props) => (
-            <TouchableOpacity
-              {...(props as any)}
-              style={{
-                position: "absolute",
-                left: width / 6 - 32, 
-                backgroundColor: "#0095FF",
-                top:13 ,
-                width: 64,
-                height: 64,
-                borderRadius: 32,
-                justifyContent: "center",
-                alignItems: "center",
-                shadowOpacity: 0.3,
-                shadowRadius: 6,
-                elevation: 8,
-              }}
-            >
-              <Ionicons name="bluetooth" size={28} color="#fff" />
-            </TouchableOpacity>
-          ),
+          href: null,
         }}
       />
 
-      Right Tab
       <Tabs.Screen
         name="profile"
         options={{
