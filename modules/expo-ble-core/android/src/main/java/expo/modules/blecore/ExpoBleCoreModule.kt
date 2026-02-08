@@ -301,7 +301,7 @@ class ExpoBleCoreModule : Module() {
     Function("clearDiscoveredStudents") {
       discoveredStudents.clear()
       discoveredDeviceAddresses.clear()
-      android.util.Log.d(TAG, "🧹 Cleared discovered students")
+      android.util.Log.d(TAG, "🧹 Cleared discovered students and device addresses")
       return@Function true
     }
 
@@ -485,55 +485,76 @@ class ExpoBleCoreModule : Module() {
   
   if (scanRecord == null) return
   
-  val context = appContext.reactContext ?: return
-  var studentLabel: String? = null
-
-  // Strategy 1: Device Name via BLUETOOTH_CONNECT
-  val hasConnectPerm = if (Build.VERSION.SDK_INT >= 31) {
-    ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
-  } else {
-    true
+  // Early deduplication by device address
+  if (discoveredDeviceAddresses.contains(device.address)) {
+    return // Skip already processed devices completely
   }
   
-  if (hasConnectPerm) {
-    try {
-      val deviceName = device.name
-      if (deviceName != null && deviceName.matches(Regex("^[A-Za-z0-9]+$")) && deviceName.length <= 8) {
-        studentLabel = deviceName
-        android.util.Log.i(TAG, "🔍 Found student via device.name: '$studentLabel' (RSSI: $rssi)")
-      }
-    } catch (e: SecurityException) {
-      android.util.Log.e(TAG, "Security exception getting device name: ${e.message}")
-    }
-  }
+  val context = appContext.reactContext ?: return
+  var studentLabel: String? = null
+  var isValidStudent = false
 
-  // Strategy 2: Advertised Device Name from Scan Record (iOS devices)
-  if (studentLabel == null) {
-    val advertName = scanRecord.deviceName
-    if (advertName != null && advertName.matches(Regex("^[A-Za-z0-9]+$")) && advertName.length <= 8) {
-      studentLabel = advertName
-      android.util.Log.i(TAG, "🔍 Found student via scanRecord.deviceName: '$studentLabel' (RSSI: $rssi)")
-    }
-  }
+  // Strategy 1: Check if this device is advertising our attendance service (PRIORITY)
+  val serviceUuids = scanRecord.serviceUuids
+  val hasAttendanceService = serviceUuids?.any { 
+    it.uuid.toString().equals(ATTENDANCE_SERVICE_UUID, ignoreCase = true) 
+  } == true
 
-  // Strategy 3: Manufacturer Data (Android Students)
-  if (studentLabel == null) {
+  if (hasAttendanceService) {
+    android.util.Log.d(TAG, "📡 Device advertising attendance service: ${device.address}")
+    
+    // Strategy 1A: Manufacturer Data (Android Students)
     val manufData = scanRecord.getManufacturerSpecificData(MANUFACTURER_ID)
     if (manufData != null) {
       try {
         val decoded = String(manufData, Charsets.UTF_8)
         if (decoded.matches(Regex("^[A-Za-z0-9]+$")) && decoded.length <= 8) {
           studentLabel = decoded
+          isValidStudent = true
           android.util.Log.i(TAG, "🔍 Found student via manufacturer data: '$studentLabel' (RSSI: $rssi)")
         }
       } catch (e: Exception) {
         // Ignore decode errors
       }
     }
+
+    // Strategy 1B: Advertised Device Name from Scan Record (iOS devices)
+    if (studentLabel == null) {
+      val advertName = scanRecord.deviceName
+      if (advertName != null && advertName.matches(Regex("^[A-Za-z0-9]+$")) && advertName.length <= 8) {
+        studentLabel = advertName
+        isValidStudent = true
+        android.util.Log.i(TAG, "🔍 Found student via scanRecord.deviceName: '$studentLabel' (RSSI: $rssi)")
+      }
+    }
+
+    // Strategy 1C: Device Name via BLUETOOTH_CONNECT (fallback)
+    if (studentLabel == null) {
+      val hasConnectPerm = if (Build.VERSION.SDK_INT >= 31) {
+        ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+      } else {
+        true
+      }
+      
+      if (hasConnectPerm) {
+        try {
+          val deviceName = device.name
+          if (deviceName != null && deviceName.matches(Regex("^[A-Za-z0-9]+$")) && deviceName.length <= 8) {
+            studentLabel = deviceName
+            isValidStudent = true
+            android.util.Log.i(TAG, "🔍 Found student via device.name: '$studentLabel' (RSSI: $rssi)")
+          }
+        } catch (e: SecurityException) {
+          android.util.Log.e(TAG, "Security exception getting device name: ${e.message}")
+        }
+      }
+    }
+  } else {
+    android.util.Log.d(TAG, "⏩ Skipping device without attendance service: ${device.address}")
   }
 
-  // Process discovered student
-  if (studentLabel != null) {
+  // Process discovered student only if they have the attendance service
+  if (studentLabel != null && isValidStudent) {
     addDiscoveredStudent(studentLabel, device.address, rssi, "BLE")
   }
 }
@@ -594,9 +615,15 @@ class ExpoBleCoreModule : Module() {
       return
     }
 
-    // De-duplication
+    // De-duplication by student ID
     if (discoveredStudents.containsKey(studentLabel)) {
-      android.util.Log.d(TAG, "ℹ️  Already discovered (duplicate)")
+      android.util.Log.d(TAG, "⏩ FILTERED OUT (duplicate student ID)")
+      return
+    }
+
+    // De-duplication by device address  
+    if (discoveredDeviceAddresses.contains(deviceAddress)) {
+      android.util.Log.d(TAG, "⏩ FILTERED OUT (duplicate device address)")
       return
     }
 
@@ -614,6 +641,7 @@ class ExpoBleCoreModule : Module() {
       System.currentTimeMillis()
     )
     discoveredStudents[studentLabel] = info
+    discoveredDeviceAddresses.add(deviceAddress)
     
     sendEvent("onStudentDiscovered", bundleOf(
       "studentId" to studentLabel,
