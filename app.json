@@ -1,9 +1,9 @@
 {
   "expo": {
     "name": "Edu Sync",
-    "slug": "edu-sync",
+    "slug": "edusync",
     "version": "1.0.0",
-    "scheme": "edu-sync",
+    "scheme": "edusync",
     "web": {
       "bundler": "metro",
       "output": "static",
@@ -52,11 +52,19 @@
       "edgeToEdgeEnabled": true,
       "permissions": [
         "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.VIBRATE",
+
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",
         "android.permission.BLUETOOTH_SCAN",
         "android.permission.BLUETOOTH_ADVERTISE",
         "android.permission.BLUETOOTH_CONNECT",
+
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION"
       ]
