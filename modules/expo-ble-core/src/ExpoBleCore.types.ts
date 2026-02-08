@@ -30,14 +30,14 @@ export type ExpoBleCoreModuleType = {
 
   isScanning(): boolean;
 
-  getDiscoveredStudents(): Array<{
+  getDiscoveredStudents(): {
     studentId: number;
     deviceAddress: string;
     rssi: number;
     discoveredAt: number;
     verified: boolean;
     verifiedAt: number | null;
-  }>;
+  }[];
 
   clearDiscoveredStudents(): boolean;
 
@@ -57,11 +57,11 @@ export type ExpoBleCoreModuleType = {
     success: number;
     failed: number;
     cancelled: boolean;
-    results: Array<{
+    results: {
       deviceAddress: string;
       success: boolean;
       error: string;
-    }>;
+    }[];
   }>;
 
   cancelAlertRollout(): {
@@ -73,13 +73,13 @@ export type ExpoBleCoreModuleType = {
 
   markStudentVerified(studentId: number): boolean;
 
-  getAttendanceReport(): Array<{
+  getAttendanceReport(): {
     studentId: number;
     deviceAddress: string;
     status: 'present' | 'unverified';
     discoveredAt: number;
     verifiedAt: number | null;
-  }>;
+  }[];
 
   // ============== STUDENT FUNCTIONS (BleAttendee) ==============
 
@@ -157,7 +157,7 @@ export const BleConstants = {
   DEFAULT_ALERT_DELAY_MS: 2000,
 
   // Manufacturer ID
-  MANUFACTURER_ID: 0xFFFF,
+  MANUFACTURER_ID: 0xffff,
 } as const;
 
 // ============== HELPER TYPES ==============

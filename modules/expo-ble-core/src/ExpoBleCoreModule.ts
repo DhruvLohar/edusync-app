@@ -21,14 +21,9 @@ export type BleModuleEvents = {
     status: 'connecting' | 'success' | 'failed';
   }): void;
 
-  onAlertReceived(params: {
-    alertType: number;
-    timestamp: number;
-  }): void;
+  onAlertReceived(params: { alertType: number; timestamp: number }): void;
 
-  onBluetoothStateChanged(params: {
-    enabled: boolean;
-  }): void;
+  onBluetoothStateChanged(params: { enabled: boolean }): void;
 };
 
 // ============== MODULE DECLARATION ==============
@@ -142,10 +137,7 @@ export function addAlertProgressListener(
  * Fired when professor sends an alert to this device
  */
 export function addAlertReceivedListener(
-  listener: (event: {
-    alertType: number;
-    timestamp: number;
-  }) => void
+  listener: (event: { alertType: number; timestamp: number }) => void
 ): EventSubscription {
   return BleModule.addListener('onAlertReceived', listener);
 }
@@ -155,9 +147,7 @@ export function addAlertReceivedListener(
  * Fired when Bluetooth is turned on/off
  */
 export function addBluetoothStateChangedListener(
-  listener: (event: {
-    enabled: boolean;
-  }) => void
+  listener: (event: { enabled: boolean }) => void
 ): EventSubscription {
   return BleModule.addListener('onBluetoothStateChanged', listener);
 }
