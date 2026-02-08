@@ -31,36 +31,6 @@ interface CheckInStatusData {
     checkedInAt: number;
 }
 
-// ==========================================
-// 1. UPDATED PACKET CALCULATOR (Split Logic)
-// ==========================================
-function calculateBLEPacketSize(classId: string, studentId: number) {
-    // Payload Structure: [ClassID Bytes] + "_" (1 byte) + [StudentID (4 bytes)]
-    const classIdBytes = new TextEncoder().encode(classId).length;
-    const separatorBytes = 1; 
-    const studentIdBytes = 4; 
-    
-    const payloadSize = classIdBytes + separatorBytes + studentIdBytes;
-
-    // Android Legacy Advertising Limit: 31 Bytes
-    // Mandatory Overhead:
-    // - Flags: 3 bytes
-    // - Manufacturer Header: 4 bytes
-    // Total Overhead = 7 bytes
-    const overhead = 7;
-    
-    // Available Space for Payload = 31 - 7 = 24 bytes
-    const maxPayloadSize = 31 - overhead;
-
-    return {
-        payloadSize,
-        maxPayloadSize,
-        withinLimit: payloadSize <= maxPayloadSize,
-        // Max chars for Class ID = 24 - 1 (separator) - 4 (studentId) = 19 chars
-        maxClassIdLength: maxPayloadSize - separatorBytes - studentIdBytes 
-    };
-}
-
 function BleStudentView() {
     const router = useRouter();
     const [checkedIn, setCheckedIn] = useState(false);

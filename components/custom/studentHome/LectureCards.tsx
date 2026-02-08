@@ -7,9 +7,11 @@ import {
 import { useRouter } from 'expo-router';
 import { LiveAttendanceResponse } from '~/type/Teacher';
 import { fetchFromAPI } from '~/lib/api';
+import { useAuthStore } from '~/lib/store/auth.store';
 
 function LectureCards() {
   const router = useRouter();
+  const profile = useAuthStore((state) => state.profile);
   const [lecture, setLecture] = useState<LiveAttendanceResponse | null>(null);
 
   async function fetchLectures() {
@@ -32,7 +34,7 @@ function LectureCards() {
     try {
       router.push({
         pathname: '/private/(student)/(tabs)/[class_id]',
-        params: { class_id: lecture?.id.toString() as string },
+        params: { class_id: lecture?.id.toString() as string, live_id: `${lecture?.live_id}${profile?.gr_no}` },
       });
     } catch (error) {
       console.error('Navigation error:', error);

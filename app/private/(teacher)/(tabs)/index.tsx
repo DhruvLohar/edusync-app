@@ -76,7 +76,7 @@ const AttendanceCard: React.FC<ClassAttendance> = ({ name, department, time, dat
                 </View>
 
                 {/* --- Attendance Progress Section (Two Columns) --- */}
-                <View className="flex-row  items-center justify-between items-end">
+                <View className="flex-row justify-between items-end">
                     
                     {/* Progress Bar (Left Column) */}
                     <View className="flex-1 mr-4">
@@ -114,20 +114,7 @@ const HomeScreen: React.FC = () => {
         // Fetch teacher profile for name and photo
         const fetchProfile = async () => {
            const res = await fetchFromAPI<any>('/users/profile');
-            // DUMMY DATA
-            // const res = {
-            //   success: true,
-            //   data: {
-            //     id: 1,
-            //     name: 'Dr. John Smith',
-            //     email: 'john.smith@example.com',
-            //     phone: '+91-9876543210',
-            //     user_type: 'teacher',
-            //     employee_id: 'EMP001',
-            //     department: 'Computer Science',
-            //     profile_photo: 'https://via.placeholder.com/150'
-            //   }
-            // };
+
             if (res && res.success && res.data) {
                 setTeacherName(res.data.name || 'Teacher');
                 let url = renderAPIImage(res.data.profile_photo);

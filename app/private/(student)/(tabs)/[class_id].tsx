@@ -30,29 +30,17 @@ import {
 } from '~/lib/ImageChecker';
 import { fetchFromAPI } from '~/lib/api';
 import { Attendance } from '~/type/Teacher';
+import { useAuthStore } from '~/lib/store/auth.store';
+import { useStudentAttendance } from '~/lib/hook/useStudentAttendance';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SIMILARITY_THRESHOLD = 0.6;
-
-// --- DUMMY DATA ---
-const DUMMY_LIVE_DATA = {
-  id: 10,
-  class_id: 2,
-  live_id: "pMqRk",
-  start_time: "2026-02-08T19:16:22.624Z",
-  class: {
-    id: 2,
-    department: "CSE",
-    year: "BE",
-    subject: "Blockchain"
-  }
-};
 
 type ScanPhase = 'idle' | 'camera' | 'processing' | 'confirmed';
 
 const StudentHomeScreen: React.FC = () => {
+
   const router = useRouter();
-  const { class_id } = useLocalSearchParams<{ class_id: string }>();
+  const { class_id, live_id } = useLocalSearchParams<{ class_id: string, live_id: string }>();
 
   // --- STATE ---
   const [attendanceDetails, setAttendanceDetails] = useState<Attendance | null>(null);
@@ -70,13 +58,42 @@ const StudentHomeScreen: React.FC = () => {
   const device = useCameraDevice('front');
   const { hasPermission, requestPermission } = useCameraPermission();
 
+  // Memoize callbacks to prevent infinite re-renders
+  const onAlertReceived = useCallback(() => {
+    console.log('✅ Attendance verified by teacher!');
+    setScanPhase('confirmed');
+  }, []);
+
+  const onCheckInSuccess = useCallback(() => {
+    console.log('✅ BLE Check-in successful');
+  }, []);
+
+  const onCheckOutSuccess = useCallback(() => {
+    console.log('✅ BLE Check-out successful');
+  }, []);
+
+  // --- BLE ATTENDANCE HOOK ---
+  const {
+    checkedIn,
+    alertReceived,
+    isProcessing: isBleProcessing,
+    handleCheckIn,
+    handleCheckOut,
+  } = useStudentAttendance({
+    onAlertReceived,
+    onCheckInSuccess,
+    onCheckOutSuccess,
+  });
+
   async function fetchLiveAttendanceDetails() {
     const res = await fetchFromAPI('teachers/attendance/' + class_id);
 
     if (res && res.success) {
-      setAttendanceDetails(res.data);
+      const data: Attendance = res.data;
+      setAttendanceDetails(data);
     }
   }
+
   const loadRegisteredUser = async () => {
     try {
       const allKeys = await AsyncStorage.getAllKeys();
@@ -95,7 +112,7 @@ const StudentHomeScreen: React.FC = () => {
   useEffect(() => {
     fetchLiveAttendanceDetails();
     loadRegisteredUser();
-  }, [class_id]);
+  }, [class_id, live_id]);
 
   // --- ANIMATION LOGIC ---
   const startPumpingAnimation = useCallback(() => {
@@ -140,7 +157,7 @@ const StudentHomeScreen: React.FC = () => {
   // Interpolations for Ripple Effect
   const rippleScale = scaleAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [1, 2.5],
+    outputRange: [1, 2.5],  
   });
 
   const rippleOpacity = opacityAnim.interpolate({
@@ -213,10 +230,27 @@ const StudentHomeScreen: React.FC = () => {
     }
   }, [registeredUser]);
 
-  const triggerServerProcess = useCallback(() => {
-    // This is where you would make the actual API call
-    console.log('Valid face. Sending request to server...');
-  }, []);
+  const triggerServerProcess = useCallback(async () => {
+    // Validate live_id exists
+    if (!live_id) {
+      console.error('[BLE Error]: live_id is null');
+      Alert.alert('Error', 'Attendance session not found. Please try again.');
+      setScanPhase('idle');
+      return;
+    }
+
+    // After face verification, trigger BLE check-in
+    console.log('[Valid face. Initiating BLE check-in]:', live_id);
+
+    const result = await handleCheckIn(live_id);
+    if (result.success) {
+      console.log('✅ BLE broadcasting started');
+      // Stay in processing phase until teacher verifies (onAlertReceived callback)
+    } else {
+      Alert.alert('Check-in Failed', result.error || 'Unable to start BLE broadcast');
+      setScanPhase('idle');
+    }
+  }, [live_id, handleCheckIn]);
 
   if (!attendanceDetails || !attendanceDetails.class) {
     return (
@@ -292,12 +326,12 @@ const StudentHomeScreen: React.FC = () => {
           {scanPhase === 'confirmed' ? (
             <View className="w-48 h-48 rounded-full bg-white items-center justify-center shadow-lg border-4 border-green-500">
               <MaterialCommunityIcons name="check-circle" size={80} color="#22c55e" />
-              <Text className="text-green-600 font-bold mt-2">Marked!</Text>
+              <Text className="text-green-600 font-bold mt-2">Done!</Text>
             </View>
           ) : scanPhase === 'processing' ? (
             <View className="w-48 h-48 rounded-full bg-white items-center justify-center shadow-lg border-4 border-[#0095FF]">
               <ActivityIndicator size="large" color="#0095FF" />
-              <Text className="text-[#0095FF] font-medium mt-4 text-xs tracking-widest uppercase">Verifying...</Text>
+              <Text className="text-[#0095FF] font-medium mt-4 text-xs tracking-widest uppercase">Present Siiiir...</Text>
             </View>
           ) : (
             <TouchableOpacity
@@ -319,17 +353,24 @@ const StudentHomeScreen: React.FC = () => {
             </Text>
           )}
           {scanPhase === 'processing' && (
-            <Text className="text-gray-400 text-center max-w-[250px]">
-              Please wait while we confirm your attendance with the server.
-            </Text>
+            <View className="items-center">
+              <Text className="text-gray-400 text-center max-w-[250px]">
+                {checkedIn ? 'Keep app open. Waiting for teacher verification...' : 'Please wait while we confirm your attendance.'}
+              </Text>
+            </View>
           )}
           {scanPhase === 'confirmed' && (
-            <TouchableOpacity
-              onPress={() => router.back()}
-              className="bg-gray-100 px-8 py-3 rounded-full"
-            >
-              <Text className="text-gray-600 font-medium">Return Home</Text>
-            </TouchableOpacity>
+            <View className="items-center">
+              <TouchableOpacity
+                onPress={() => {
+                  handleCheckOut();
+                  router.back();
+                }}
+                className="bg-gray-100 px-8 py-3 rounded-full"
+              >
+                <Text className="text-gray-600 font-medium">Return Home</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
 
