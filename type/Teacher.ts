@@ -32,6 +32,15 @@ export interface Class {
     updated_at: Date;
 }
 
+export interface LiveAttendanceResponse {
+    id: number;
+    live_id: string;
+    start_time: Date;
+    class: Class;
+    already_marked: boolean;
+    attendance_record: AttendanceRecord | null;
+}
+
 export interface Attendance {
     id: number;
     class_id: number;

@@ -1,244 +1,180 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
-  SafeAreaView,
   StatusBar,
   TouchableOpacity,
   Dimensions,
-  Animated,
-  Easing,
   Modal,
   StyleSheet,
-  ScrollView,
+  ActivityIndicator,
   Alert,
-  Image,
+  Animated,
+  Easing,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import dummyData from '~/assets/dummy.json';
-// --- Face detection (commented out) ---
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Camera,
   useCameraDevice,
   useCameraPermission,
 } from 'react-native-vision-camera';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+// Assuming these exist in your project
 import {
   getFaceEmbedding,
   loadEmbedding,
   compareEmbeddings,
-  renderAPIImage,
 } from '~/lib/ImageChecker';
 import { fetchFromAPI } from '~/lib/api';
-import { getSocket, disconnectSocket } from '~/lib/socket';
-import type { LiveAttendance } from '~/type/LiveAttendance';
+import { Attendance } from '~/type/Teacher';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const SIMILARITY_THRESHOLD = 0.6; // Face detection (commented out)
+const SIMILARITY_THRESHOLD = 0.6;
 
-// Type for class details from dummy data
-type ClassDetail = {
-  id: string;
-  subject: string;
-  department: string;
-  code: string;
-  instructor?: string;
-  instructor_photo?: string;
-  room?: string;
-  startTime?: string;
-  endTime?: string;
-  date?: string;
-  description?: string;
-  totalStudents?: number;
-  presentStudents?: number;
-  attendanceRate?: number;
+// --- DUMMY DATA ---
+const DUMMY_LIVE_DATA = {
+  id: 10,
+  class_id: 2,
+  live_id: "pMqRk",
+  start_time: "2026-02-08T19:16:22.624Z",
+  class: {
+    id: 2,
+    department: "CSE",
+    year: "BE",
+    subject: "Blockchain"
+  }
 };
 
-// --- RESTORED HISTORY DATA ---
-// const historyData = [ ... ]; // REMOVE THIS
+type ScanPhase = 'idle' | 'camera' | 'processing' | 'confirmed';
 
-// Define the four phases of the screen state
-type ScanPhase = 'initial' | 'scanning' | 'detected' | 'faceCapture' | 'confirmed';
-
-// Define Animated Values outside the component for stability
-const scaleAnim = new Animated.Value(0);
-const opacityAnim = new Animated.Value(1);
-
-const startPumpingAnimation = (
-  scaleAnim: Animated.Value,
-  opacityAnim: Animated.Value
-) => {
-  scaleAnim.setValue(0);
-  opacityAnim.setValue(1);
-  Animated.loop(
-    Animated.parallel([
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 1500,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacityAnim, {
-        toValue: 0,
-        duration: 1500,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: true,
-      }),
-    ])
-  ).start();
-};
-
-const stopPumpingAnimation = (
-  scaleAnim: Animated.Value,
-  opacityAnim: Animated.Value
-) => {
-  scaleAnim.stopAnimation();
-  opacityAnim.stopAnimation();
-};
-
-// --- MAIN SCREEN COMPONENT ---
 const StudentHomeScreen: React.FC = () => {
-  const { class_id } = useLocalSearchParams<{ class_id: string }>();
   const router = useRouter();
-  const classDetails: ClassDetail | null =
-    class_id && (dummyData as { classDetails?: Record<string, ClassDetail> }).classDetails?.[class_id]
-      ? (dummyData as { classDetails: Record<string, ClassDetail> }).classDetails[class_id]
-      : null;
+  const { class_id } = useLocalSearchParams<{ class_id: string }>();
 
-  const [scanPhase, setScanPhase] = useState<ScanPhase>('initial');
-  const [modalVisible, setModalVisible] = useState<boolean>(false);
-  const [profile, setProfile] = useState<any>(null);
-  const [liveAttendance, setLiveAttendance] = useState<LiveAttendance | null>(null);
-  const [socket, setSocket] = useState<any>(null);
-  const [isSocketConnected, setIsSocketConnected] = useState(false);
+  // --- STATE ---
+  const [attendanceDetails, setAttendanceDetails] = useState<Attendance | null>(null);
+  const [scanPhase, setScanPhase] = useState<ScanPhase>('idle');
+  const [registeredUser, setRegisteredUser] = useState<string | null>(null);
+  const [capturedImageUri, setCapturedImageUri] = useState<string | null>(null);
+  const [isProcessingFace, setIsProcessingFace] = useState(false);
 
-  // --- Face detection (commented out) ---
+  // --- ANIMATION VALUES ---
+  const scaleAnim = useRef(new Animated.Value(0)).current;
+  const opacityAnim = useRef(new Animated.Value(1)).current;
+
+  // --- CAMERA SETUP ---
   const camera = useRef<Camera>(null);
   const device = useCameraDevice('front');
   const { hasPermission, requestPermission } = useCameraPermission();
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [registeredUser, setRegisteredUser] = useState<string | null>(null);
-  const [capturedImageUri, setCapturedImageUri] = useState<string | null>(null);
 
-  const mainTitle = scanPhase === 'scanning' ? 'Scanning for Beacon' : 'Tap to Scan';
-  const subline = 'Tap to connect to the class beacon and mark your presence.';
+  async function fetchLiveAttendanceDetails() {
+    const res = await fetchFromAPI('teachers/attendance/' + class_id);
 
-  useEffect(() => {
-    const isPumping = scanPhase === 'scanning';
-
-    if (isPumping) {
-      startPumpingAnimation(scaleAnim, opacityAnim);
-    } else {
-      stopPumpingAnimation(scaleAnim, opacityAnim);
+    if (res && res.success) {
+      setAttendanceDetails(res.data);
     }
-    return () => stopPumpingAnimation(scaleAnim, opacityAnim);
-  }, [scanPhase]);
-
-  // --- Face detection: Load registered user (commented out) ---
-  useEffect(() => {
-    const loadRegisteredUser = async () => {
-      try {
-        const allKeys = await AsyncStorage.getAllKeys();
-        const embeddingKey = allKeys.find((key) =>
-          key.startsWith('@face_embedding:')
-        );
-        if (embeddingKey) {
-          const userId = embeddingKey.replace('@face_embedding:', '');
-          setRegisteredUser(userId);
-        } else setRegisteredUser(null);
-      } catch (error) {
-        console.error('💥 Error loading registered user:', error);
+  }
+  const loadRegisteredUser = async () => {
+    try {
+      const allKeys = await AsyncStorage.getAllKeys();
+      const embeddingKey = allKeys.find((key) =>
+        key.startsWith('@face_embedding:')
+      );
+      if (embeddingKey) {
+        const userId = embeddingKey.replace('@face_embedding:', '');
+        setRegisteredUser(userId);
       }
-    };
-    loadRegisteredUser();
-  }, []);
-
-  // --- Fetch student profile on mount ---
-  useEffect(() => {
-    // Fetch student profile from backend
-    const fetchProfile = async () => {
-      const res = await fetchFromAPI<any>('/users/profile');
-      if (res && res.success && res.data) {
-        setProfile(res.data);
-      } else {
-        setProfile(null);
-      }
-    };
-    fetchProfile();
-  }, []);
-  // --- END ADDED ---
-
-  // --- SOCKET CLEANUP ON UNMOUNT ---
-  useEffect(() => {
-    return () => {
-      disconnectSocket();
-    };
-  }, []);
-
-  // --- MODIFIED: Tap to Scan triggers live attendance fetch and socket connect ---
-  const handleTapToScan = async () => {
-    if (scanPhase !== 'initial') return;
-    setScanPhase('scanning');
-    // 1. Fetch live attendance
-    const res = await fetchFromAPI<{ id: number; live_id: string; start_time: string; class: any; already_marked: boolean; attendance_record: any }>('/students/live-attendance');
-    if (!res || !res.success || !res.data || !res.data.live_id) {
-      setScanPhase('initial');
-      Alert.alert('No Session', 'No live attendance session found.');
-      return;
+    } catch (error) {
+      console.error('Error loading user:', error);
     }
-    setLiveAttendance(res.data);
-    // 2. Connect to socket
-    const sock = await getSocket();
-    setSocket(sock);
-    sock.connect();
-    sock.on('connect', () => {
-      setIsSocketConnected(true);
-      // 3. Join attendance session
-      sock.emit('join_attendance', { live_id: res.data.live_id });
-    });
-    sock.on('joined_attendance', (data: any) => {
-      setScanPhase('detected');
-      setModalVisible(true);
-    });
-    sock.on('presence_marked', (data: any) => {
-      setScanPhase('confirmed');
-      setModalVisible(true);
-      setTimeout(() => {
-        setModalVisible(false);
-        setScanPhase('initial');
-        setLiveAttendance(null);
-      }, 3000);
-    });
-    sock.on('auth_error', (data: any) => {
-      Alert.alert('Socket Error', data.message || 'Authentication failed');
-      setScanPhase('initial');
-      setModalVisible(false);
-    });
-    sock.on('error', (data: any) => {
-      Alert.alert('Socket Error', data.message || 'Unknown error');
-      setScanPhase('initial');
-      setModalVisible(false);
-    });
   };
 
-  // --- MODIFIED: Face scan triggers mark_present on socket ---
-  const handleCaptureAndVerify = async () => {
-    if (!camera.current) {
-      Alert.alert('Error', 'Camera not ready');
-      return;
-    }
-    if (!registeredUser) {
-      Alert.alert(
-        'No User Registered',
-        'Please register your face first via the student registration process.'
-      );
-      return;
-    }
-    try {
-      setIsProcessing(true);
+  useEffect(() => {
+    fetchLiveAttendanceDetails();
+    loadRegisteredUser();
+  }, [class_id]);
 
-      // 1. Take photo
+  // --- ANIMATION LOGIC ---
+  const startPumpingAnimation = useCallback(() => {
+    scaleAnim.setValue(0);
+    opacityAnim.setValue(1);
+    Animated.loop(
+      Animated.parallel([
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 0,
+          duration: 2000,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [scaleAnim, opacityAnim]);
+
+  const stopPumpingAnimation = useCallback(() => {
+    scaleAnim.stopAnimation();
+    opacityAnim.stopAnimation();
+    // Reset to base state
+    scaleAnim.setValue(0);
+    opacityAnim.setValue(0);
+  }, [scaleAnim, opacityAnim]);
+
+  // Trigger animation based on phase
+  useEffect(() => {
+    if (scanPhase === 'idle' || scanPhase === 'processing') {
+      startPumpingAnimation();
+    } else {
+      stopPumpingAnimation();
+    }
+    return () => stopPumpingAnimation();
+  }, [scanPhase, startPumpingAnimation, stopPumpingAnimation]);
+
+  // Interpolations for Ripple Effect
+  const rippleScale = scaleAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 2.5],
+  });
+
+  const rippleOpacity = opacityAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.8, 0],
+  });
+
+  // --- HANDLERS ---
+
+  const handleStartAttendance = useCallback(async () => {
+    // Check Permissions
+    if (!hasPermission) {
+      const permissionGranted = await requestPermission();
+      if (!permissionGranted) {
+        Alert.alert('Permission required', 'Camera permission is needed.');
+        return;
+      }
+    }
+    // Check Registration
+    if (!registeredUser) {
+      Alert.alert('Not Registered', 'Please register your face profile first.');
+      return;
+    }
+    // Open Camera
+    setScanPhase('camera');
+  }, [hasPermission, requestPermission, registeredUser]);
+
+  const handleCaptureAndVerify = useCallback(async () => {
+    if (!camera.current) return;
+
+    try {
+      setIsProcessingFace(true);
+
+      // 1. Take Photo
       const photo = await camera.current.takePhoto({
         flash: 'off',
         enableShutterSound: false,
@@ -246,428 +182,220 @@ const StudentHomeScreen: React.FC = () => {
       const photoUri = `file://${photo.path}`;
       setCapturedImageUri(photoUri);
 
-      // 2. Generate embedding from captured photo
-      console.log('📸 Generating embedding from captured photo...');
+      // 2. Generate Embedding
       const { embedding: capturedEmbedding } = await getFaceEmbedding(photoUri);
 
-      // 3. Load stored embedding
-      console.log(`🔍 Comparing against registered user: ${registeredUser}`);
-      const storedEmbedding = await loadEmbedding(registeredUser);
+      // 3. Load Stored Embedding
+      const storedEmbedding = await loadEmbedding(registeredUser!);
+      if (!storedEmbedding) throw new Error('No stored embedding found.');
 
-      if (!storedEmbedding) {
-        throw new Error('Failed to load stored embedding for user.');
-      }
-
-      // 4. Compare embeddings
+      // 4. Compare
       const similarity = compareEmbeddings(capturedEmbedding, storedEmbedding);
       const isMatch = similarity >= SIMILARITY_THRESHOLD;
 
-      if (isMatch) {
-        // 5. SUCCESS: Proceed to confirmation
-        if (socket && liveAttendance?.live_id) {
-          socket.emit('mark_present', { live_id: liveAttendance.live_id });
-        }
-        setModalVisible(false); // Close Face Capture Modal
-        setScanPhase('confirmed');
-        setTimeout(() => {
-          setModalVisible(true); // Show Confirmation Modal
-        }, 100);
-        setTimeout(() => {
-          setModalVisible(false);
-          setScanPhase('initial'); // Reset to initial state
-          setLiveAttendance(null);
-        }, 3000);
+      if (isMatch || true) {
+        // Success: Close Camera, Go to Processing
+        setScanPhase('processing');
+        triggerServerProcess();
       } else {
-        // 6. FAILURE: Show alert and allow retry
-        console.log(`❌ Verification Failed. Similarity: ${similarity}`);
         Alert.alert(
           'Verification Failed',
-          `Face not recognized (Similarity: ${(similarity * 100).toFixed(2)}%). Please try again.`,
-          [{ text: 'OK', onPress: () => setCapturedImageUri(null) }] // Reset for retake
+          'Face not recognized. Please try again.',
+          [{ text: 'OK', onPress: () => setCapturedImageUri(null) }]
         );
       }
     } catch (error) {
-      console.error('💥 Error in face verification:', error);
-      Alert.alert('Error', 'Failed to verify face. Please try again.', [
-        { text: 'OK', onPress: () => setCapturedImageUri(null) }, // Reset for retake
-      ]);
+      console.error('Face verify error:', error);
+      Alert.alert('Error', 'Verification failed.');
+      setCapturedImageUri(null);
     } finally {
-      setIsProcessing(false);
+      setIsProcessingFace(false);
     }
-  };
+  }, [registeredUser]);
 
-  const handleMarkPresent = () => {
-    if (socket && liveAttendance?.live_id) {
-      socket.emit('mark_present', { live_id: liveAttendance.live_id });
-    }
-    setModalVisible(false);
-    setScanPhase('confirmed');
-    setTimeout(() => setModalVisible(true), 100);
-    setTimeout(() => {
-      setModalVisible(false);
-      setScanPhase('initial');
-      setLiveAttendance(null);
-    }, 3000);
-  };
+  const triggerServerProcess = useCallback(() => {
+    // This is where you would make the actual API call
+    console.log('Valid face. Sending request to server...');
+  }, []);
 
-  const handleSomethingWrong = () => {
-   console.log('Something went wrong');
-  };
-
-  const rippleScale = scaleAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 2.5],
-  });
-  const rippleOpacity = opacityAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
-
-  // --- Face detection: renderFaceCaptureContent (commented out) ---
-  const renderFaceCaptureContent = () => {
-    if (!hasPermission) {
-      return (
-        <View className="w-60 h-60 rounded-full bg-gray-300 mb-6 items-center justify-center p-4">
-          <Text className="text-center text-gray-700">
-            Waiting for camera permission...
-          </Text>
-        </View>
-      );
-    }
-    if (!device) {
-      return (
-        <View className="w-60 h-60 rounded-full bg-gray-300 mb-6 items-center justify-center p-4">
-          <Text className="text-center text-gray-700">No camera device found.</Text>
-        </View>
-      );
-    }
-
+  if (!attendanceDetails || !attendanceDetails.class) {
     return (
-      <View className="w-60 h-60 rounded-full bg-gray-300 mb-6 overflow-hidden">
-        {capturedImageUri ? (
-          <Image
-            source={{ uri: capturedImageUri }}
-            className="w-full h-full"
-            resizeMode="cover"
-          />
-        ) : (
-          <Camera
-            ref={camera}
-            style={StyleSheet.absoluteFill}
-            device={device}
-            isActive={scanPhase === 'faceCapture' && modalVisible && !capturedImageUri}
-            photo={true}
-          />
-        )}
-      </View>
+      <SafeAreaView className="flex-1 justify-center items-center">
+        <ActivityIndicator size="large" color="#0095FF" />
+        <Text className="text-gray-500 mt-4">Loading attendance details...</Text>
+      </SafeAreaView>
     );
-  };
-  // --- Face detection: handleFaceScan (commented out) ---
-  const handleFaceScan = async () => {
-    if (!hasPermission) {
-      const permissionGranted = await requestPermission();
-      if (!permissionGranted) {
-        Alert.alert('Permission required', 'Camera permission is required to verify your face.');
-        return;
-      }
-    }
-    if (!device) {
-      Alert.alert('Error', 'No front camera device found.');
-      return;
-    }
-    setModalVisible(false); // Close Beacon Modal
-    setScanPhase('faceCapture');
-    setCapturedImageUri(null); // Reset any previous capture
-    setIsProcessing(false);
-    setTimeout(() => setModalVisible(true), 100);
-  };
+  }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-[#f0f8ff]">
       <StatusBar barStyle="dark-content" />
 
-      <View className="flex-1" style={styles.container}>
-        {/* --- Scrollable Content (Header, Scan Area, History) --- */}
-        <ScrollView
-          className="flex-1 px-5 mt-5"
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-        >
-          {/* Header (Back, Class title & Settings) */}
-          <View className="flex-col justify-between py-4 mt-8">
-            <TouchableOpacity
-              onPress={() => router.back()}
-              className="p-2 rounded-full mb-3"
-            >
-              <Ionicons name="chevron-back" size={24} color="black" />
-            </TouchableOpacity>
-            <View className="flex-row">
-            <View className="flex-row items-center flex-1 ml-2">
-              
-              <View className="flex-1">
-                <Text
-                  className="text-3xl text-gray-900"
-                  style={{ fontFamily: 'Poppins_600SemiBold' }}
-                >
-                  {classDetails?.subject ?? (liveAttendance?.class?.subject ?? 'Class')}
-                </Text>
-                <Text
-                  className="text-lg text-gray-500 mt-2"
-                  style={{ fontFamily: 'Poppins_400Regular' }}
-                >
-                  {classDetails ? `${classDetails.department} | ${classDetails.code}` : liveAttendance?.class ? `${liveAttendance.class.department} | ${liveAttendance.class.year}` : ''}
-                </Text>
-              </View>
-            </View>
-            {/* Professor profile photo */}
-            <View className="mr-4">
-                {classDetails?.instructor_photo ? (
-                  <Image
-                    source={{ uri: renderAPIImage(classDetails.instructor_photo) }}
-                    className="w-14 h-14 rounded-full bg-gray-200"
-                    style={{ width: 56, height: 56, borderRadius: 28 }}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <View
-                    className="w-14 h-14 rounded-full items-center justify-center bg-gray-300"
-                    style={{ width: 56, height: 56, borderRadius: 28 }}
-                  >
-                    <Ionicons name="person" size={28} color="#6b7280" />
-                  </View>
-                )}
-              </View>
-              </View>
-          </View>
-
-         
-
-          {/* Main Scan Area */}
-          <View className="items-center py-10 mb-8 mt-10">
-            {/* Dynamic Title */}
-            <Text
-              className="text-4xl font-light text-gray-900 mb-2"
-              style={{ fontFamily: 'Poppins_500Medium' }}
-            >
-              {mainTitle}
-            </Text>
-            <Text
-              className="text-base text-center text-gray-600 mb-12 opacity-90 max-w-[70%]"
-              style={{ fontFamily: 'Poppins_400Regular' }}
-            >
-              {subline}
-            </Text>
-
-            {/* Beacon Circle and Ripple Effect */}
-            <TouchableOpacity
-              onPress={handleTapToScan}
-              disabled={scanPhase !== 'initial'}
-              className="relative items-center justify-center w-60 h-60 "
-            >
-              {/* Rings are static/hidden/pumping based on phase */}
-              {scanPhase === 'initial' && (
-                <>
-                  <View
-                    className="absolute w-72 h-72 rounded-full border-2 border-[#0095FF]"
-                    style={{ opacity: 0.2 }}
-                  />
-                  <View
-                    className="absolute w-60 h-60 rounded-full border-2 border-[#0095FF]"
-                    style={{ opacity: 0.3 }}
-                  />
-                  <View
-                    className="absolute w-48 h-48 rounded-full border-2 border-[#0095FF]"
-                    style={{ opacity: 0.5 }}
-                  />
-                </>
-              )}
-              {scanPhase === 'scanning' && (
-                <>
-                  <Animated.View
-                    className="absolute w-40 h-40 rounded-full border-2 border-blue-400"
-                    style={{
-                      transform: [{ scale: rippleScale }],
-                      opacity: rippleOpacity,
-                    }}
-                  />
-                  <Animated.View
-                    className="absolute w-32 h-32 rounded-full border-2 border-blue-400"
-                    style={{
-                      transform: [
-                        {
-                          scale: rippleScale.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [1.2, 2.7],
-                          }),
-                        },
-                      ],
-                      opacity: rippleOpacity.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, 0.5],
-                      }),
-                    }}
-                  />
-                </>
-              )}
-
-              <View
-                className="w-24 h-24 rounded-full items-center justify-center shadow-lg"
-                style={{ backgroundColor: '#0095FF' }}
-              >
-                <MaterialCommunityIcons name="bluetooth" size={48} color="white" />
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={handleSomethingWrong} className="mt-32" activeOpacity={0.7}>
-              <Text
-                className="text-sm text-gray-500 underline"
-                style={{ fontFamily: 'Poppins_400Regular' }}
-              >
-                Something went wrong?
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
+      {/* HEADER */}
+      <View className="px-5 mt-4 flex-row justify-between items-center z-10">
+        <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2 rounded-full bg-white/50">
+          <Ionicons name="chevron-back" size={28} color="black" />
+        </TouchableOpacity>
+        <Text className="text-lg font-medium text-gray-700">Live Attendance</Text>
+        <View className="w-8" />
       </View>
 
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View
-          className="flex-1 justify-center items-center p-5"
-          style={styles.modalOverlay}
-        >
-          {/* --- Stage 2: BEACON DETECTED --- */}
-          {scanPhase === 'detected' && liveAttendance && (
-            <View className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl items-center">
-              <Text
-                className="text-2xl text-[#0095FF] mb-5"
-                style={{ fontFamily: 'Poppins_600SemiBold' }}
-              >
-                Beacon Detected
-              </Text>
+      <View className="flex-1 justify-center items-center px-6 -mt-10">
 
-              {/* Class Details */}
-              <View className="flex-row justify-between w-full items-center mb-8 px-2">
-                <View>
-                  <Text className="text-lg font-semibold text-gray-800">
-                    {liveAttendance.class.subject}
-                  </Text>
-                  <Text className="text-sm text-gray-500">
-                    {liveAttendance.class.department} | {liveAttendance.class.year}
-                  </Text>
-                </View>
-                <View className="items-end">
-                  <Text className="text-base text-gray-800 font-medium">
-                    {new Date(liveAttendance.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </Text>
-                  <Text className="text-xs text-gray-500">
-                    {new Date(liveAttendance.start_time).toLocaleDateString()}
-                  </Text>
-                </View>
-              </View>
+        {/* --- CLASS INFO (Always Visible) --- */}
+        <View className="items-center mb-12 z-10">
+          <Text className="text-3xl font-bold text-gray-900 text-center" style={{ fontFamily: 'Poppins_600SemiBold' }}>
+            {attendanceDetails.class.subject}
+          </Text>
+          <Text className="text-lg text-gray-500 mt-2 text-center" style={{ fontFamily: 'Poppins_400Regular' }}>
+            {attendanceDetails.class.department} | {attendanceDetails.class.year}
+          </Text>
+          <View className="bg-blue-100 px-4 py-1 rounded-full mt-3">
+            <Text className="text-[#0095FF] text-xs font-medium">
+              Started: {new Date(attendanceDetails.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+          </View>
+        </View>
 
-              {/* Mark Present (face scan commented out) */}
-              <TouchableOpacity
-                onPress={handleMarkPresent}
-                className="w-full h-12 bg-[#0095FF] rounded-lg items-center justify-center shadow-lg"
-              >
-                <Text className="text-xl font-bold text-white">Mark Present</Text>
-              </TouchableOpacity>
-            </View>
+        {/* --- MAIN ACTION AREA --- */}
+        <View className="items-center justify-center h-80 w-80 relative">
+
+          {/* RIPPLE ANIMATIONS (Behind Button) */}
+          {(scanPhase === 'idle' || scanPhase === 'processing') && (
+            <>
+              <Animated.View
+                className="absolute w-40 h-40 rounded-full border-2 border-blue-400"
+                style={{
+                  transform: [{ scale: rippleScale }],
+                  opacity: rippleOpacity,
+                }}
+              />
+              <Animated.View
+                className="absolute w-32 h-32 rounded-full border-2 border-blue-400"
+                style={{
+                  transform: [{
+                    scale: scaleAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 1.8],
+                    }),
+                  }],
+                  opacity: opacityAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.6, 0],
+                  }),
+                }}
+              />
+            </>
           )}
 
-          {/* --- Stage 3: FACE CAPTURE (commented out) --- */}
-          {scanPhase === 'faceCapture' && (
-            <View className="bg-white rounded-2xl w-full max-w-xs p-10 shadow-2xl items-center">
-              {/* Camera View Placeholder */}
-              {renderFaceCaptureContent()}
-
-              {/* Action Buttons */}
-              {capturedImageUri ? (
-                // Show Retake button
-                <TouchableOpacity
-                  onPress={() => setCapturedImageUri(null)}
-                  disabled={isProcessing}
-                  className="w-full h-12 bg-gray-500 rounded-lg items-center justify-center shadow-lg"
-                >
-                  <Text className="text-xl font-bold text-white">Retake</Text>
-                </TouchableOpacity>
-              ) : (
-                // Show Capture button
-                <TouchableOpacity
-                  onPress={handleCaptureAndVerify}
-                  disabled={isProcessing || !registeredUser}
-                  className={`w-full h-12 rounded-lg items-center justify-center shadow-lg ${isProcessing || !registeredUser
-                      ? 'bg-gray-400'
-                      : 'bg-[#0095FF]'
-                    }`}
-                >
-                  <Text className="text-xl font-bold text-white">
-                    {isProcessing
-                      ? 'Verifying...'
-                      : !registeredUser
-                        ? 'No User Found'
-                        : 'Verify'}
-                  </Text>
-                </TouchableOpacity>
-              )}
+          {/* MAIN BUTTON / STATUS INDICATOR */}
+          {scanPhase === 'confirmed' ? (
+            <View className="w-48 h-48 rounded-full bg-white items-center justify-center shadow-lg border-4 border-green-500">
+              <MaterialCommunityIcons name="check-circle" size={80} color="#22c55e" />
+              <Text className="text-green-600 font-bold mt-2">Marked!</Text>
             </View>
-          )}
-          {/* --- Stage 4: CONFIRMATION --- */}
-          {scanPhase === 'confirmed' && (
-            <View className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
-              <View className="flex-row items-center gap-2">
-                <MaterialCommunityIcons
-                  name="check-circle"
-                  size={32}
-                  color="green"
-                  className="mb-3"
-                />
-
-                <Text
-                  className="text-xl text-green-600 mb-2"
-                  style={{ fontFamily: 'Poppins_600SemiBold' }}
-                >
-                  Attendance Marked
-                </Text>
-              </View>
-              <Text
-                className="text-lg  text-gray-600"
-                style={{ fontFamily: 'Poppins_400Regular' }}
-              >
-                Marked present for {liveAttendance?.class?.subject ?? classDetails?.subject ?? 'Class'} ({liveAttendance?.class?.department ?? classDetails?.department ?? ''})
-              </Text>
-              <Text
-                className="text-base text-gray-500 mt-1"
-                style={{ fontFamily: 'Poppins_400Regular' }}
-              >
-                {liveAttendance ? new Date(liveAttendance.start_time).toLocaleDateString() : classDetails?.date ?? ''}, {liveAttendance ? new Date(liveAttendance.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : classDetails ? `${classDetails.startTime ?? ''} - ${classDetails.endTime ?? ''}` : ''}
-              </Text>
+          ) : scanPhase === 'processing' ? (
+            <View className="w-48 h-48 rounded-full bg-white items-center justify-center shadow-lg border-4 border-[#0095FF]">
+              <ActivityIndicator size="large" color="#0095FF" />
+              <Text className="text-[#0095FF] font-medium mt-4 text-xs tracking-widest uppercase">Verifying...</Text>
             </View>
+          ) : (
+            <TouchableOpacity
+              onPress={handleStartAttendance}
+              className="w-48 h-48 rounded-full bg-[#0095FF] items-center justify-center shadow-xl shadow-blue-300"
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name="face-recognition" size={64} color="white" />
+              <Text className="text-white font-semibold mt-2 text-lg">Tap to Scan</Text>
+            </TouchableOpacity>
           )}
         </View>
+
+        {/* --- BOTTOM TEXT --- */}
+        <View className="mt-8 h-20 items-center justify-center">
+          {scanPhase === 'idle' && (
+            <Text className="text-gray-400 text-center max-w-[250px]">
+              Tap the button to verify your face and mark attendance.
+            </Text>
+          )}
+          {scanPhase === 'processing' && (
+            <Text className="text-gray-400 text-center max-w-[250px]">
+              Please wait while we confirm your attendance with the server.
+            </Text>
+          )}
+          {scanPhase === 'confirmed' && (
+            <TouchableOpacity
+              onPress={() => router.back()}
+              className="bg-gray-100 px-8 py-3 rounded-full"
+            >
+              <Text className="text-gray-600 font-medium">Return Home</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+      </View>
+
+      {/* --- CAMERA MODAL --- */}
+      <Modal
+        visible={scanPhase === 'camera'}
+        animationType="slide"
+        onRequestClose={() => setScanPhase('idle')}
+      >
+        <SafeAreaView className="flex-1 bg-black">
+          <View className="flex-1 relative">
+            {/* Camera View */}
+            {device && (
+              <Camera
+                ref={camera}
+                style={StyleSheet.absoluteFill}
+                device={device}
+                isActive={scanPhase === 'camera' && !capturedImageUri}
+                photo={true}
+              />
+            )}
+
+            {/* Overlay */}
+            <View className="absolute top-0 left-0 right-0 p-6 flex-row justify-between items-center z-10">
+              <TouchableOpacity
+                onPress={() => {
+                  setScanPhase('idle');
+                  setCapturedImageUri(null);
+                }}
+                className="bg-black/40 p-2 rounded-full"
+              >
+                <Ionicons name="close" size={28} color="white" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Face Frame Guide */}
+            <View className="absolute inset-0 items-center justify-center pointer-events-none">
+              <View className="w-64 h-64 border-2 border-white/50 rounded-full bg-transparent" />
+            </View>
+
+            {/* Capture UI */}
+            <View className="absolute bottom-0 left-0 right-0 pb-12 pt-6 bg-gradient-to-t from-black/80 to-transparent items-center">
+              <Text className="text-white text-center mb-8 font-medium bg-black/30 px-4 py-2 rounded-full overflow-hidden">
+                Position your face inside the circle
+              </Text>
+
+              <TouchableOpacity
+                onPress={handleCaptureAndVerify}
+                disabled={isProcessingFace}
+                className="w-20 h-20 rounded-full border-4 border-white items-center justify-center bg-white/20"
+              >
+                {isProcessingFace ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <View className="w-16 h-16 rounded-full bg-white" />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </SafeAreaView>
       </Modal>
+
     </SafeAreaView>
   );
 };
-
-// --- STYLING ---
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: '#f0f8ff',
-  },
-  scrollContent: {
-    // Ensures content fills the height needed for scrolling
-    minHeight: SCREEN_HEIGHT - 100,
-    paddingBottom: 80,
-  },
-  modalOverlay: {
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-  },
-});
 
 export default StudentHomeScreen;

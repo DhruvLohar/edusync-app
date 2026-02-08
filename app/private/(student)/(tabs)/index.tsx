@@ -2,14 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  SafeAreaView,
   StatusBar,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
   Image,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { fetchFromAPI } from '~/lib/api';
 import { renderAPIImage } from '~/lib/ImageChecker';
@@ -18,6 +16,7 @@ import TodaysLecture from '~/components/custom/studentHome/AttendanceHistory';
 import LectureCards from '~/components/custom/studentHome/LectureCards';
 import { BottomModal } from '~/components/ui/BottomModal';
 import type { AttendanceRecord } from '~/type/Student';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 
 // --- MAIN SCREEN COMPONENT ---
@@ -66,7 +65,7 @@ const StudentHomeScreen: React.FC = () => {
       >
         {/* Header (Greeting & Settings Icon) */}
         <View className="w-full px-5 flex-row justify-between items-center py-4 mt-8">
-          
+
           <View className="flex-1 ml-4">
             <Text
               className="text-xl text-gray-600 mb-1"
@@ -91,7 +90,7 @@ const StudentHomeScreen: React.FC = () => {
             <View className="w-24 h-24 rounded-full bg-gray-300 border-4 border-white shadow-md mb-2" />
           )}
         </View>
- <View className="px-5 mt-6 mb-6">
+        <View className="px-5 mt-6 mb-6">
           <TouchableOpacity
             onPress={() => setIsAttendanceModalVisible(true)}
             className="w-full bg-[#0095FF] rounded-full py-4 items-center justify-center"
@@ -123,10 +122,10 @@ const StudentHomeScreen: React.FC = () => {
             className="text-2xl text-gray-900 mt-4"
             style={{ fontFamily: 'Poppins_600SemiBold' }}
           >
-            Today's Lectures
+            Ongoing Lecture
           </Text>
         </View>
-        <LectureCards history={history} />
+        <LectureCards />
       </BottomModal>
     </SafeAreaView>
   );

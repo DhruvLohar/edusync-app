@@ -1,4 +1,4 @@
-// import {loadTensorflowModel, TensorflowModel, useTensorflowModel} from 'react-native-fast-tflite'
+import {loadTensorflowModel, TensorflowModel, useTensorflowModel} from 'react-native-fast-tflite'
 import * as ImageManipulator from 'expo-image-manipulator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { decode as atob } from 'base-64';
@@ -10,28 +10,27 @@ interface EmbeddingResult {
   embedding: number[];
 }
 
-// let model: TensorflowModel | null = null;
-let model : any = null;
+let model: TensorflowModel | null = null;
 const EMBEDDING_STORAGE_KEY = '@face_embedding:';
 
-// export function useFaceNetModel() {
-//   return useTensorflowModel(require('../assets/models/facenet_model(4).tflite'));
-// }
+export function useFaceNetModel() {
+  return useTensorflowModel(require('../assets/models/facenet_model(4).tflite'));
+}
 
 export function renderAPIImage(uri: string) {
-  return uri.replace('http://127.0.0.1:8000', API_URL);
+  return uri.replace('http://127.0.0.1:3000', API_URL);
 }
 
 // export function useFaceNetResize() {
 //   return useResizePlugin();
 // }
 
-// export async function loadFaceNetModel(): Promise<TensorflowModel> {
-//   if (model) return model;
-//   model = await loadTensorflowModel(require('../assets/models/facenet_model(4).tflite'));
-//   console.log('🤖 FaceNet model loaded');
-//   return model;
-// }
+export async function loadFaceNetModel(): Promise<TensorflowModel> {
+  if (model) return model;
+  model = await loadTensorflowModel(require('../assets/models/facenet_model(4).tflite'));
+  console.log('🤖 FaceNet model loaded');
+  return model;
+}
 
 // // THIS FUNCTION IS DEPRECATED as it's not reliable for getting the full embedding
 // export function processCameraFrameForFaceEmbedding(frame: any, model: TensorflowModel, resizeFunc: any): number {

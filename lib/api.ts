@@ -1,7 +1,7 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-export const API_URL = 'http://192.168.0.105:3000'
+export const API_URL = 'http://192.168.1.5:3000'
 
 axios.defaults.baseURL = API_URL;
 
@@ -23,12 +23,13 @@ export async function postToAPI<T>(
     url: string,
     data: any,
     sendingFile: boolean = false,
-    auth: boolean = false
+    auth: boolean = true
 ): Promise<ApiResponse<T> | any> {
     try {
         let headers: { [key: string]: string } = {
             'Content-Type': sendingFile ? 'multipart/form-data' : 'application/json',
         };
+
         if (auth) {
             const sessionString = await SecureStore.getItemAsync('session');
             const session: Session = sessionString ? JSON.parse(sessionString) : {};
