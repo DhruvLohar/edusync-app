@@ -1,52 +1,71 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import dummyData from '~/assets/dummy-teacher.json';
 import { useRouter } from 'expo-router';
+import { Student } from '~/type/Student';
+import { fetchFromAPI, postToAPI } from '~/lib/api';
 
 
-export interface TeacherLecture {
+interface TeacherLectureResponse {
   id: number;
-  subject: string;
   department: string;
-  code: string;
-  classId: string;
-  room?: string;
-  startTime: string;
-  endTime: string;
-  isOngoing: boolean;
+  year: string;
+  subject: string;
+  teacher_id: number;
+  created_at: string;
+  updated_at: string;
+  total_students: number;
+  total_attendance_sessions: number;
+  students: Student[];
 }
 
-interface LectureCardsProps {
-  onSelectLecture?: (classId: string, lecture: TeacherLecture) => void;
-}
-
-const LectureCards: React.FC<LectureCardsProps> = ({ onSelectLecture }) => {
+function LectureCards() {
   const router = useRouter();
 
-  const [todayLectures, setTodayLectures] = useState<TeacherLecture[]>([]);
+  const [todayLectures, setTodayLectures] = useState<TeacherLectureResponse[]>([]);
+
+  async function fetchLectures() {
+    try {
+      const res = await fetchFromAPI('teachers/fetch-classes');
+      console.log(res);
+
+      if (res && res.success) {
+        setTodayLectures(res.data);
+      }
+    } catch (error) {
+      console.error('Error fetching lectures:', error);
+    }
+  }
 
   useEffect(() => {
-    setTodayLectures((dummyData as { todayLectures?: TeacherLecture[] }).todayLectures || []);
+    fetchLectures();
   }, []);
 
-  const handleCardPress = (classId: string) => {
+  const createAttendance = async (classId: number) => {
     try {
-      router.push({
-        pathname: '/private/(teacher)/(tabs)/[class_id]',
-        params: { class_id: classId },
-      });
+
+      const res = await postToAPI('teachers/start-attendance', { class_id: classId }, false, true);
+
+      if (res && res.success) {
+        router.push({
+          pathname: '/private/(teacher)/(tabs)/[class_id]',
+          params: { class_id: res.data.id, live_id: res.data.live_id },
+        });
+      } else {
+        Alert.alert('Error', res?.message || 'Failed to start attendance session. Please try again.');
+      }
     } catch (error) {
-      console.error('Navigation error:', error);
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
     }
   };
 
-  const LectureCard = ({ lecture, isOngoing }: { lecture: TeacherLecture; isOngoing?: boolean }) => (
+  const LectureCard = ({ lecture }: { lecture: TeacherLectureResponse }) => (
     <TouchableOpacity
-      onPress={() => handleCardPress(lecture.classId)}
+      onPress={() => createAttendance(lecture.id)}
       activeOpacity={0.7}
     >
       <View
-        className="w-full bg-white rounded-2xl p-5 flex-row items-center"
+        className="w-full bg-white rounded-2xl p-5 flex-row items-center justify-between"
         style={{
           borderLeftWidth: 5,
           borderLeftColor: isOngoing ? '#ef4444' : '#0095FF',
@@ -73,29 +92,23 @@ const LectureCards: React.FC<LectureCardsProps> = ({ onSelectLecture }) => {
             className="text-sm text-gray-500"
             style={{ fontFamily: 'Poppins_400Regular' }}
           >
-            {lecture.department} | {lecture.code}
+            {lecture.department} | {lecture.year}
           </Text>
-          {lecture.room && (
-            <Text
-              className="text-xs text-gray-400 mt-1"
-              style={{ fontFamily: 'Poppins_400Regular' }}
-            >
-              {lecture.room}
-            </Text>
-          )}
         </View>
         <View className="items-end">
+          <View className="bg-blue-50 px-3 py-1 rounded-full mb-1">
+            <Text
+              className="text-xs font-semibold text-[#0095FF]"
+              style={{ fontFamily: 'Poppins_600SemiBold' }}
+            >
+              {lecture.total_students} Students
+            </Text>
+          </View>
           <Text
-            className="text-base font-semibold text-gray-900"
-            style={{ fontFamily: 'Poppins_600SemiBold' }}
-          >
-            {lecture.startTime}
-          </Text>
-          <Text
-            className="text-xs text-gray-500"
+            className="text-xs text-gray-400"
             style={{ fontFamily: 'Poppins_400Regular' }}
           >
-            {lecture.startTime} – {lecture.endTime}
+            {lecture.total_attendance_sessions} Sessions
           </Text>
         </View>
       </View>
@@ -109,7 +122,6 @@ const LectureCards: React.FC<LectureCardsProps> = ({ onSelectLecture }) => {
           <LectureCard
             key={lecture.id}
             lecture={lecture}
-            isOngoing={lecture.isOngoing}
           />
         ))
       ) : (
@@ -129,4 +141,4 @@ const LectureCards: React.FC<LectureCardsProps> = ({ onSelectLecture }) => {
   );
 };
 
-export default LectureCards;
+export default React.memo(LectureCards);

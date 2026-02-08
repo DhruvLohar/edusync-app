@@ -129,18 +129,6 @@ const BeaconSession: React.FC<BeaconSessionProps> = ({ selectedCourse, showBackB
   const startAttendanceSession = async () => {
     try {
       const res = await postToAPI('/teachers/start-attendance', { class_id: selectedCourse?.id });
-      // DUMMY DATA
-      // const res = {
-      //   success: true,
-      //   data: {
-      //     id: 1,
-      //     live_id: 'live_session_12345',
-      //     class_id: selectedCourse?.id,
-      //     class: selectedCourse,
-      //     start_time: new Date().toISOString(),
-      //     attendance_records: []
-      //   }
-      // };
 
       if (res.success) {
         setAttendance(res.data);
@@ -200,7 +188,7 @@ const BeaconSession: React.FC<BeaconSessionProps> = ({ selectedCourse, showBackB
     setIsModalVisible(false);
   };
 
-  
+
 
   const rippleScale = animatedScale.interpolate({
     inputRange: [0, 1],
@@ -237,7 +225,7 @@ const BeaconSession: React.FC<BeaconSessionProps> = ({ selectedCourse, showBackB
   const bgColor = isSessionActive ? '#1a2a3a' : '#D3EDFF';
   const statusBarStyle = isSessionActive ? 'light-content' : 'dark-content';
 
-  
+
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: bgColor }}>
@@ -390,40 +378,7 @@ const AddAttendanceScreen: React.FC = () => {
 
   const fetchClasses = async () => {
     try {
-    const res = await fetchFromAPI('/teachers/fetch-classes');
-      // DUMMY DATA
-      // const res = {
-      //   success: true,
-      //   data: [
-      //     {
-      //       id: 1,
-      //       name: 'Database Systems',
-      //       code: 'CS301',
-      //       semester: 7,
-      //       students: 50,
-      //       subject: 'Database Systems',
-      //       department: 'CSE'
-      //     },
-      //     {
-      //       id: 2,
-      //       name: 'Web Development',
-      //       code: 'CS302',
-      //       semester: 7,
-      //       students: 45,
-      //       subject: 'Web Development',
-      //       department: 'CSE'
-      //     },
-      //     {
-      //       id: 3,
-      //       name: 'AI & ML',
-      //       code: 'CS303',
-      //       semester: 7,
-      //       students: 40,
-      //       subject: 'AI & ML',
-      //       department: 'CSE'
-      //     }
-      //   ]
-      // };
+      const res = await fetchFromAPI('/teachers/fetch-classes');
 
       if (res.success) {
         setClasses(res.data);
@@ -433,7 +388,7 @@ const AddAttendanceScreen: React.FC = () => {
     }
   };
 
- 
+
 
   const handleSelectCourse = (course: Class) => {
     setSelectedCourse(course);
@@ -442,13 +397,11 @@ const AddAttendanceScreen: React.FC = () => {
 
   if (!selectedCourse) {
     return (
-      <>
-        <CourseSelectionModal
-          classes={classes}
-          onSelect={handleSelectCourse}
-          isVisible={true}
-        />
-      </>
+      <CourseSelectionModal
+        classes={classes}
+        onSelect={handleSelectCourse}
+        isVisible={true}
+      />
     );
   }
 
