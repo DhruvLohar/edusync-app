@@ -1,11 +1,4 @@
-import { requireNativeView } from 'expo';
-import * as React from 'react';
-
-import { ExpoBleCoreViewProps } from './ExpoBleCore.types';
-
-const NativeView: React.ComponentType<ExpoBleCoreViewProps> =
-  requireNativeView('ExpoBleCore');
-
-export default function ExpoBleCoreView(props: ExpoBleCoreViewProps) {
-  return <NativeView {...props} />;
+export default function ExpoBleCoreView() {
+  console.warn('ExpoBleCoreView has been removed in favor of module functions.');
+  return null;
 }

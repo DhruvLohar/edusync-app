@@ -18,6 +18,10 @@ export default function ProtectedLayout() {
                 
                 {/* Keep other protected screens accessible */}
                 <Stack.Screen name="editprofile" options={{ headerShown: false }} />
+
+                <Stack.Screen name="ble-student" />
+                <Stack.Screen name="ble-teacher" />
+                {/* <Stack.Screen name="editprofile" options={{ headerShown: false }} /> */}
             </Stack>
         </GestureHandlerRootView>
     );
