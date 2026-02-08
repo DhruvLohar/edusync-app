@@ -2,7 +2,7 @@ import {loadTensorflowModel, TensorflowModel, useTensorflowModel} from 'react-na
 import * as ImageManipulator from 'expo-image-manipulator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { decode as atob } from 'base-64';
-import { useResizePlugin } from 'vision-camera-resize-plugin';
+// import { useResizePlugin } from 'vision-camera-resize-plugin';
 import { decode as jpegDecode } from 'jpeg-js';
 import { API_URL } from './api';
 
@@ -18,12 +18,12 @@ export function useFaceNetModel() {
 }
 
 export function renderAPIImage(uri: string) {
-  return uri.replace('http://127.0.0.1:8000', API_URL);
+  return uri.replace('http://127.0.0.1:3000', API_URL);
 }
 
-export function useFaceNetResize() {
-  return useResizePlugin();
-}
+// export function useFaceNetResize() {
+//   return useResizePlugin();
+// }
 
 export async function loadFaceNetModel(): Promise<TensorflowModel> {
   if (model) return model;
@@ -32,25 +32,25 @@ export async function loadFaceNetModel(): Promise<TensorflowModel> {
   return model;
 }
 
-// THIS FUNCTION IS DEPRECATED as it's not reliable for getting the full embedding
-export function processCameraFrameForFaceEmbedding(frame: any, model: TensorflowModel, resizeFunc: any): number {
-  'worklet'
-  if (!model) return 0;
-  try {
-    const resized = resizeFunc(frame, {
-      scale: { width: 160, height: 160 },
-      pixelFormat: 'rgb',
-      dataType: 'float32',
-    });
-    const outputs = model.runSync([resized]);
-    if (!outputs || outputs.length === 0) return 0;
-    const embedding = outputs[0] as Float32Array;
-    return embedding.length;
-  } catch (error) {
-    console.error('💥 Error in camera frame processing:', error);
-    return 0;
-  }
-}
+// // THIS FUNCTION IS DEPRECATED as it's not reliable for getting the full embedding
+// export function processCameraFrameForFaceEmbedding(frame: any, model: TensorflowModel, resizeFunc: any): number {
+//   'worklet'
+//   if (!model) return 0;
+//   try {
+//     const resized = resizeFunc(frame, {
+//       scale: { width: 160, height: 160 },
+//       pixelFormat: 'rgb',
+//       dataType: 'float32',
+//     });
+//     const outputs = model.runSync([resized]);
+//     if (!outputs || outputs.length === 0) return 0;
+//     const embedding = outputs[0] as Float32Array;
+//     return embedding.length;
+//   } catch (error) {
+//     console.error('💥 Error in camera frame processing:', error);
+//     return 0;
+//   }
+// }
 
 
 // --- NEW AND CORRECTED preProcessImage FUNCTION ---

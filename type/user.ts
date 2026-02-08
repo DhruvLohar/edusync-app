@@ -11,6 +11,21 @@ export enum Department {
     IT = "IT",
 }
 
+export const DEPARTMENTS = {
+    CSE: "Computer Science",
+    AIDS: "AI/DS",
+    MECH: "Mechanical",
+    EEE: "Electronics",
+    IT: "Information Technology",
+} as const;
+
+export const YEARS = {
+    FE: "First Year",
+    SE: "Second Year",
+    TE: "Third Year",
+    BE: "Final Year",
+} as const;
+
 export enum Year {
     FE = "FE",
     SE = "SE",

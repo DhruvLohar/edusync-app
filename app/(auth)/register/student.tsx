@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  SafeAreaView,
   View,
   Text,
   StatusBar,
@@ -16,16 +15,20 @@ import { InputField } from '~/components/ui/Input';
 import { Button } from '~/components/ui/Button';
 import { getFaceEmbedding, saveEmbedding } from '~/lib/ImageChecker';
 import { postToAPI } from '~/lib/api';
-import { RegistrationResponse } from '~/types/auth';
+import { RegistrationResponse } from '~/type/auth';
 import { useAuthStore } from '~/lib/store/auth.store';
-const DEPARTMENTS = [
-  'Computer Science',
-  'Information Technology',
-  'Mechanical',
-  'Electronics',
-  'AI/DS',
-];
-const ACADEMIC_YEARS = ['First Year', 'Second Year', 'Third Year', 'Final Year'];
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Department, Year, DEPARTMENTS, YEARS } from '~/type/user';
+
+// Create arrays for display
+const DEPARTMENT_OPTIONS = Object.entries(DEPARTMENTS).map(([key, value]) => ({
+  key: key as Department,
+  label: value,
+}));
+const YEAR_OPTIONS = Object.entries(YEARS).map(([key, value]) => ({
+  key: key as Year,
+  label: value,
+}));
 
 interface StepIndicatorProps {
   step: number;
@@ -72,8 +75,8 @@ export default function StudentRegistrationScreen() {
 
   // Academic Details
   const [grNumber, setGrNumber] = useState('');
-  const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
-  const [selectedAcademicYear, setSelectedAcademicYear] = useState<string | null>(null);
+  const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState<Year | null>(null);
 
   // Face Recognition
   const [capturedImageUri, setCapturedImageUri] = useState<string | null>(null);
@@ -87,7 +90,7 @@ export default function StudentRegistrationScreen() {
     if (currentStep === 3 && !hasPermission) {
       requestPermission();
     }
-  }, [currentStep]);
+  }, [currentStep, hasPermission]);
 
   const handleNext = () => {
     // Validation for step 1
@@ -129,7 +132,7 @@ export default function StudentRegistrationScreen() {
 
     try {
       setIsProcessing(true);
-      
+
       // Take photo
       const photo = await camera.current.takePhoto({
         flash: 'off',
@@ -154,9 +157,6 @@ export default function StudentRegistrationScreen() {
         `Face registered successfully for ${fullName}!`,
         [{ text: 'OK' }]
       );
-
-      console.log(`✅ Face embedding saved for: ${userId}`);
-      console.log(`📊 Embedding dimensions: ${embedding.length}D`);
 
     } catch (error) {
       console.error('💥 Error in face capture/processing:', error);
@@ -193,34 +193,14 @@ export default function StudentRegistrationScreen() {
           type: 'image/jpeg',
         } as any);
       }
+
       // Optionally, you can append the embedding if needed by backend
       // formData.append('embedding', JSON.stringify(embedding));
 
-      console.log('Submitting Registration Form Data:', {
-        name: fullName,
-        email,
-        phone: phoneNumber,
-        user_type: 'student',
-        Department: selectedDepartment,
-        year: selectedAcademicYear,
-        gr_no: grNumber,
-        profile_photo: capturedImageUri,
-      }); 
-      const response = await postToAPI<RegistrationResponse>('/users/onboard', formData, true, true);
-      // DUMMY DATA (COMMENTED OUT)
-      /*
-      const response: RegistrationResponse = {
-        success: true,
-        message: 'Registration successful',
-        data: {
-          user_id: 1,
-          name: fullName,
-          email,
-          user_type: 'student',
-          onboarding_done: true
-        }
-      };
-      */
+      const response = await postToAPI<RegistrationResponse>('/users/onboard', formData, true);
+
+      console.log("Student register : ", response);
+
       console.log('Registration Response:', response);
       if (response && response.success) {
         await authStore.refreshUser();
@@ -243,17 +223,15 @@ export default function StudentRegistrationScreen() {
 
   const StepIndicator: React.FC<StepIndicatorProps> = ({ step, title, isActive }) => (
     <View className="flex-row items-center">
-      <View className={`w-6 h-6 rounded-full justify-center items-center mr-2 border ${
-        isActive ? 'bg-[#1E90FF] border-[#1E90FF]' : 'bg-white border-gray-400'
-      }`}>
+      <View className={`w-6 h-6 rounded-full justify-center items-center mr-2 border ${isActive ? 'bg-[#1E90FF] border-[#1E90FF]' : 'bg-white border-gray-400'
+        }`}>
         <Text className="text-white text-xs font-bold text-center leading-6">
           {isActive ? '✓' : ''}
         </Text>
       </View>
-      <Text 
-        className={`text-sm font-medium max-w-[70px] ${
-          isActive ? 'text-[#1E90FF]' : 'text-gray-400'
-        }`}
+      <Text
+        className={`text-sm font-medium max-w-[70px] ${isActive ? 'text-[#1E90FF]' : 'text-gray-400'
+          }`}
         style={{ fontFamily: 'Poppins_500Medium' }}
       >
         {title}
@@ -296,9 +274,9 @@ export default function StudentRegistrationScreen() {
         />
       </View>
 
-      <Button 
-        title="Next" 
-        onPress={handleNext} 
+      <Button
+        title="Next"
+        onPress={handleNext}
         className="h-14 bg-[#1E90FF] rounded-xl justify-center items-center mt-5"
       />
     </>
@@ -327,23 +305,21 @@ export default function StudentRegistrationScreen() {
           Department
         </Text>
         <View className="flex-row flex-wrap gap-2.5 mb-5">
-          {DEPARTMENTS.map((dept) => (
+          {DEPARTMENT_OPTIONS.map((dept) => (
             <TouchableOpacity
-              key={dept}
-              className={`px-4 py-2.5 rounded-lg border ${
-                selectedDepartment === dept
+              key={dept.key}
+              className={`px-4 py-2.5 rounded-lg border ${selectedDepartment === dept.key
                   ? 'border-[#1E90FF] bg-[#E8F2FF]'
                   : 'border-gray-300 bg-white'
-              }`}
-              onPress={() => setSelectedDepartment(dept)}
-            >
-              <Text 
-                className={`text-sm ${
-                  selectedDepartment === dept ? 'text-[#1E90FF] font-bold' : 'text-gray-700'
                 }`}
+              onPress={() => setSelectedDepartment(dept.key)}
+            >
+              <Text
+                className={`text-sm ${selectedDepartment === dept.key ? 'text-[#1E90FF] font-bold' : 'text-gray-700'
+                  }`}
                 style={{ fontFamily: 'Poppins_400Regular' }}
               >
-                {dept}
+                {dept.label}
               </Text>
             </TouchableOpacity>
           ))}
@@ -353,32 +329,30 @@ export default function StudentRegistrationScreen() {
           Academic Year
         </Text>
         <View className="flex-row flex-wrap gap-2.5 mb-5">
-          {ACADEMIC_YEARS.map((year) => (
+          {YEAR_OPTIONS.map((year) => (
             <TouchableOpacity
-              key={year}
-              className={`px-4 py-2.5 rounded-lg border ${
-                selectedAcademicYear === year
+              key={year.key}
+              className={`px-4 py-2.5 rounded-lg border ${selectedAcademicYear === year.key
                   ? 'border-[#1E90FF] bg-[#E8F2FF]'
                   : 'border-gray-300 bg-white'
-              }`}
-              onPress={() => setSelectedAcademicYear(year)}
-            >
-              <Text 
-                className={`text-sm ${
-                  selectedAcademicYear === year ? 'text-[#1E90FF] font-bold' : 'text-gray-700'
                 }`}
+              onPress={() => setSelectedAcademicYear(year.key)}
+            >
+              <Text
+                className={`text-sm ${selectedAcademicYear === year.key ? 'text-[#1E90FF] font-bold' : 'text-gray-700'
+                  }`}
                 style={{ fontFamily: 'Poppins_400Regular' }}
               >
-                {year}
+                {year.label}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
       </View>
 
-      <Button 
-        title="Next" 
-        onPress={handleNext} 
+      <Button
+        title="Next"
+        onPress={handleNext}
         className="h-14 bg-[#1E90FF] rounded-xl justify-center items-center mt-5"
       />
     </>
@@ -425,8 +399,8 @@ export default function StudentRegistrationScreen() {
           {/* Camera/Image Container with proper overflow handling */}
           <View className="w-[280px] h-[280px] rounded-full mb-8 overflow-hidden bg-gray-200">
             {capturedImageUri ? (
-              <Image 
-                source={{ uri: capturedImageUri }} 
+              <Image
+                source={{ uri: capturedImageUri }}
                 className="w-full h-full"
                 resizeMode="cover"
               />
@@ -440,7 +414,7 @@ export default function StudentRegistrationScreen() {
               />
             )}
           </View>
-          
+
           <View className="flex-row gap-2.5 mb-5">
             {capturedImageUri && (
               <Button
@@ -457,9 +431,8 @@ export default function StudentRegistrationScreen() {
               onPress={captureAndProcess}
               disabled={isProcessing || embeddingSaved}
               loading={isProcessing}
-              className={`h-16 w-36 rounded-xl justify-center items-center ${
-                embeddingSaved ? 'bg-green-500' : 'bg-[#1E90FF]'
-              }`}
+              className={`h-16 w-36 rounded-xl justify-center items-center ${embeddingSaved ? 'bg-green-500' : 'bg-[#1E90FF]'
+                }`}
             />
           </View>
 
@@ -477,9 +450,8 @@ export default function StudentRegistrationScreen() {
           loading={loading}
           onPress={handleNext}
           disabled={!embeddingSaved}
-          className={`h-14 rounded-xl justify-center items-center ${
-            embeddingSaved ? 'bg-[#1E90FF]' : 'bg-gray-300'
-          }`}
+          className={`h-14 rounded-xl justify-center items-center ${embeddingSaved ? 'bg-[#1E90FF]' : 'bg-gray-300'
+            }`}
         />
       </>
     );
@@ -494,8 +466,8 @@ export default function StudentRegistrationScreen() {
       >
         <View className="mb-8 mt-10">
           <TouchableOpacity onPress={handleBack} className="self-start pr-4 py-1 mb-2.5">
-            <Image 
-              source={require('../../../assets/arrow.png')} 
+            <Image
+              source={require('../../../assets/arrow.png')}
               className="w-10 h-10 mb-5"
               resizeMode="contain"
             />

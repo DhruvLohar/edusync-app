@@ -1,12 +1,18 @@
 import React, { useState } from 'react';
-import { SafeAreaView, View, Text, StatusBar, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Modal } from 'react-native';
+import { View, Text, StatusBar, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { InputField } from '~/components/ui/Input';
 import { Button } from '~/components/ui/Button';
 import { postToAPI } from '~/lib/api';
 import { useAuthStore } from '~/lib/store/auth.store';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Department, DEPARTMENTS } from '~/type/user';
 
-const DEPARTMENTS = ['Computer Science', 'Information Technology', 'Mechanical', 'Electronics', 'AI/DS'];
+// Create array for display
+const DEPARTMENT_OPTIONS = Object.entries(DEPARTMENTS).map(([key, value]) => ({
+  key: key as Department,
+  label: value,
+}));
 
 interface StepIndicatorProps {
     step: number;
@@ -48,8 +54,7 @@ export default function TeacherRegistrationScreen() {
     const [loading, setLoading] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     
-    const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
-    const [selectedAcademicYear, setSelectedAcademicYear] = useState<string | null>(null);
+    const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
 
     // Add state for form fields
     const [fullName, setFullName] = useState('');
@@ -73,24 +78,13 @@ export default function TeacherRegistrationScreen() {
                 email,
                 phone: phoneNumber,
                 user_type: 'teacher',
-                Department: selectedDepartment,
+                department: selectedDepartment,
                 employee_id: employeeId,
             };
-            console.log('Submitting Teacher Registration:', data);
-            const response = await postToAPI('/users/onboard', data, false, true);
-            // DUMMY DATA
-            // const response = {
-            //     success: true,
-            //     message: 'Registration successful',
-            //     data: {
-            //         user_id: 1,
-            //         name: fullName,
-            //         email,
-            //         user_type: 'teacher',
-            //         onboarding_done: true
-            //     }
-            // };
+            
+            const response = await postToAPI('/users/onboard', data, false);
             console.log('Teacher Registration Response:', response);
+            
             if (response && response.success) {
                 await authStore.refreshUser();
                 setShowSuccessModal(true);
@@ -159,20 +153,20 @@ export default function TeacherRegistrationScreen() {
                 
                 <Text style={teacherStyles.fieldLabel}>Department</Text>
                 <View style={teacherStyles.chipContainer}>
-                    {DEPARTMENTS.map((dept) => (
+                    {DEPARTMENT_OPTIONS.map((dept) => (
                         <TouchableOpacity
-                            key={dept}
+                            key={dept.key}
                             style={[
                                 teacherStyles.chip,
-                                selectedDepartment === dept && teacherStyles.chipSelected,
+                                selectedDepartment === dept.key && teacherStyles.chipSelected,
                             ]}
-                            onPress={() => setSelectedDepartment(dept)}
+                            onPress={() => setSelectedDepartment(dept.key)}
                         >
                             <Text style={[
                                 teacherStyles.chipText,
-                                selectedDepartment === dept && teacherStyles.chipTextSelected,
+                                selectedDepartment === dept.key && teacherStyles.chipTextSelected,
                             ]}>
-                                {dept}
+                                {dept.label}
                             </Text>
                         </TouchableOpacity>
                     ))}

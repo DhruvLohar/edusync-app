@@ -44,6 +44,14 @@ export default function TabLayout() {
       />
       
 
+      {/* Dynamic class detail - hidden from tab bar */}
+      <Tabs.Screen
+        name="[class_id]"
+        options={{
+          href: null,
+        }}
+      />
+
       {/* Right Tab */}
       <Tabs.Screen
         name="profile"
