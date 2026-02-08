@@ -1,8 +1,9 @@
-import React from 'react';
-import { View, Text, SafeAreaView, StatusBar, ScrollView, TouchableOpacity, Dimensions, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, SafeAreaView, StatusBar, ScrollView, TouchableOpacity, Dimensions, StyleSheet, Image } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-// >>> IMPORT LINEAR GRADIENT <<<
 import { LinearGradient } from 'expo-linear-gradient'; 
+import { fetchFromAPI } from '~/lib/api';
+import { renderAPIImage } from '~/lib/ImageChecker';
 
 // --- MOCK DATA ---
 interface ClassAttendance {
@@ -105,8 +106,99 @@ const AttendanceCard: React.FC<ClassAttendance> = ({ name, department, time, dat
 
 // --- MAIN SCREEN COMPONENT ---
 const HomeScreen: React.FC = () => {
-    const userName = "Prof. Satish Ket"; 
-    
+    const [classes, setClasses] = useState<ClassAttendance[]>([]);
+    const [teacherName, setTeacherName] = useState<string>('');
+    const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
+
+    useEffect(() => {
+        // Fetch teacher profile for name and photo
+        const fetchProfile = async () => {
+           const res = await fetchFromAPI<any>('/users/profile');
+            // DUMMY DATA
+            // const res = {
+            //   success: true,
+            //   data: {
+            //     id: 1,
+            //     name: 'Dr. John Smith',
+            //     email: 'john.smith@example.com',
+            //     phone: '+91-9876543210',
+            //     user_type: 'teacher',
+            //     employee_id: 'EMP001',
+            //     department: 'Computer Science',
+            //     profile_photo: 'https://via.placeholder.com/150'
+            //   }
+            // };
+            if (res && res.success && res.data) {
+                setTeacherName(res.data.name || 'Teacher');
+                let url = renderAPIImage(res.data.profile_photo);
+                setProfilePhoto(url || null);
+            }
+        };
+        fetchProfile();
+    }, []);
+
+    useEffect(() => {
+        // Fetch teacher attendance history
+        const fetchHistory = async () => {
+           const res = await fetchFromAPI<any>('/teachers/history');
+            // DUMMY DATA
+            // const res = {
+            //   success: true,
+            //   data: [
+            //     {
+            //       id: 1,
+            //       class: { id: 1, name: 'Database Systems', code: 'CS301', semester: 7 },
+            //       start_time: '2025-01-28 10:00 AM',
+            //       end_time: '2025-01-28 11:00 AM',
+            //       summary: { total_students: 50, total_present: 48 }
+            //     },
+            //     {
+            //       id: 2,
+            //       class: { id: 2, name: 'Web Development', code: 'CS302', semester: 7 },
+            //       start_time: '2025-01-27 02:00 PM',
+            //       end_time: '2025-01-27 03:00 PM',
+            //       summary: { total_students: 45, total_present: 43 }
+            //     },
+            //     {
+            //       id: 3,
+            //       class: { id: 3, name: 'AI & ML', code: 'CS303', semester: 7 },
+            //       start_time: '2025-01-26 11:00 AM',
+            //       end_time: '2025-01-26 12:00 PM',
+            //       summary: { total_students: 40, total_present: 38 }
+            //     }
+            //   ]
+            // };
+            if (res && res.success && Array.isArray(res.data)) {
+                // Map backend data to ClassAttendance[]
+                const mapped = res.data.map((attendance: any) => {
+                    const classInfo = attendance.class || {};
+                    const presentCount = attendance.summary?.total_present || 0;
+                    const totalCapacity = attendance.summary?.total_students || 0;
+                    const progress = totalCapacity > 0 ? presentCount / totalCapacity : 0;
+                    // Format time and date
+                    const start = attendance.start_time ? new Date(attendance.start_time) : null;
+                    const end = attendance.end_time ? new Date(attendance.end_time) : null;
+                    const time = start && end ? `${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : '';
+                    const date = start ? start.toLocaleDateString() : '';
+                    return {
+                        id: attendance.id.toString(),
+                        name: classInfo.subject || '',
+                        department: classInfo.department || '',
+                        time,
+                        date,
+                        presentCount,
+                        totalCapacity,
+                        progress,
+                    };
+                });
+                setClasses(mapped);
+            } else {
+                setClasses([]);
+            }
+        };
+        fetchHistory();
+    }, []);
+
     const getGreeting = () => {
         const hour = new Date().getHours();
         if (hour < 12) return 'Good Morning,';
@@ -118,16 +210,15 @@ const HomeScreen: React.FC = () => {
     return (
         <SafeAreaView className="flex-1 bg-white"> 
             <StatusBar barStyle="dark-content" />
-
-            {/* Main Content Scrollable Area */}
             <ScrollView className="flex-1 px-5" showsVerticalScrollIndicator={false}>
-                
                 {/* Header (Greeting & Settings Icon) */}
                 <View className="flex-row justify-between items-center py-4 mt-8">
-                    {/* User Profile Placeholder Circle */}
-                    <View className="w-12 h-12 rounded-full bg-gray-200 border-2 border-white shadow-sm" /> 
-                    
-                    {/* Settings Icon (Top Right) */}
+                    {/* User Profile Photo */}
+                    {profilePhoto ? (
+                        <Image source={{ uri: profilePhoto }} className="w-12 h-12 rounded-full border-2 border-white shadow-sm" style={{ width: 48, height: 48, borderRadius: 24 }} />
+                    ) : (
+                        <View className="w-12 h-12 rounded-full bg-gray-200 border-2 border-white shadow-sm" />
+                    )}
                     <TouchableOpacity className="p-2 border border-gray-300 rounded-full">
                         <Ionicons name="settings-outline" size={24} color="black" />
                     </TouchableOpacity>
@@ -139,7 +230,7 @@ const HomeScreen: React.FC = () => {
                         {greeting}
                     </Text>
                     <Text className="text-4xl font-bold text-gray-900" style={{ fontFamily: 'Poppins_600SemiBold' }}>
-                        {userName}
+                        {teacherName}
                     </Text>
                 </View>
 
@@ -151,17 +242,17 @@ const HomeScreen: React.FC = () => {
                 </View>
 
                 {/* List of Attendance Cards */}
-                {mockClasses.map(classData => (
-                    <AttendanceCard key={classData.id} {...classData} />
-                ))}
+                {classes.length > 0 ? (
+                    classes.map(classData => (
+                        <AttendanceCard key={classData.id} {...classData} />
+                    ))
+                ) : (
+                    <Text className="text-gray-500">No attendance records found.</Text>
+                )}
 
                 {/* Extra padding to ensure last card is visible above the tab bar */}
                 <View className="h-20" /> 
-                
             </ScrollView>
-            
-            
-            
         </SafeAreaView>
     );
 };

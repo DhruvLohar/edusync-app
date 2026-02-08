@@ -17,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { InputField } from '~/components/ui/Input';
 import { Button } from '~/components/ui/Button';
 import type { PropsWithChildren } from 'react';
+import { useAuthStore } from '~/lib/store/auth.store';
 
 // --- TYPE DEFINITIONS FOR MODAL COMPONENTS ---
 interface ModalProps extends PropsWithChildren {
@@ -86,10 +87,12 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export const LoginScreen = () => {
   const router = useRouter();
+  const authStore = useAuthStore();
 
   const [loading, setLoading] = useState(false);
   const [isEmailFocused, setIsEmailFocused] = useState(false);
   const [isModalVisible, setModalVisible] = useState(false);
+  const [loginEmail, setLoginEmail] = useState<string>('');
 
   const {
     control,
@@ -100,28 +103,48 @@ export const LoginScreen = () => {
     defaultValues: { email: '' },
   });
 
-  const onSubmitStatic = (data: LoginFormData) => {
+  const onSubmitStatic = async (data: LoginFormData) => {
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const response = await authStore.login({ email: data.email });
+      console.log('Login Response:', response);
+      if (response && response.success) {
+        setLoginEmail(data.email); // Save email for OTP verification
+        setModalVisible(true);
+      } else {
+        Alert.alert('Login Failed', response?.message || 'Unable to send OTP.');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An error occurred while logging in.');
+    } finally {
       setLoading(false);
-      // Only proceed to modal if email is valid (handled by Zod/RHF)
-      setModalVisible(true);
-    }, 1500);
+    }
   };
 
-  const handleVerifyOTP = ({ otp }: { otp: string }) => {
+  const handleVerifyOTP = async ({ otp }: { otp: string }) => {
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const response = await authStore.verifyOTP(loginEmail, otp);
+      console.log('OTP Verification Response:', response);
+      if (response && response.success) {
+        setModalVisible(false);
+        Alert.alert('Success! 🎉', 'OTP verified.');
+        console.log('onboarding_done:', response.data.onboarding_done);
+        console.log('user_type:', response.data.user_type);
+        if(!response.data.onboarding_done){
+          router.push('/register');
+        } else {
+          console.log('Navigating to:', response.data.user_type === 'teacher' ? '/private/(teacher)/(tabs)' : '/private/(student)/(tabs)');
+          response.data.user_type === 'teacher' ? router.replace('/private/(teacher)/(tabs)') : router.replace('/private/(student)/(tabs)');
+        }
+      } else {
+        Alert.alert('Verification Failed', response?.message || 'Invalid OTP.');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An error occurred while verifying OTP.');
+    } finally {
       setLoading(false);
-      setModalVisible(false);
-      Alert.alert('Success! 🎉', `OTP ${otp} verified.`);
-      // FIXED: Navigate to the tabs root or specific tab
-      // Option 1: Navigate to tabs root (will show the initial route - index)
-      router.replace('/private/(teacher)/(tabs)');
-      
-      // Option 2: Navigate to a specific tab
-      // router.replace('/(tabs)/analytics');
-    }, 1500);
+    }
   };
 
   return (
@@ -175,8 +198,8 @@ export const LoginScreen = () => {
                   onFocus={() => setIsEmailFocused(true)}
                   className={`border ${
                     isEmailFocused ? 'border-[#1E90FF]' : 'border-gray-300'
-                  } rounded-lg px-0 bg-white h-12`}
-                  style={{ paddingHorizontal: 15, fontSize: 16, color: '#333' }}
+                  } rounded-lg px-4 bg-white h-12`}
+                  style={{ paddingHorizontal: 15, fontSize: 12, color: '#333' }}
                 />
               )}
             />
@@ -194,31 +217,13 @@ export const LoginScreen = () => {
             className="mt-9 h-12 py-2 bg-[#1E90FF] rounded-lg"
           />
 
-          <View className="flex-row items-center my-8">
-            <View className="flex-1 h-px bg-gray-300" />
-            <Text className="mx-4 text-gray-500 text-sm" style={{ fontFamily: 'Poppins_400Regular' }}>
-              OR
+          <View className="flex-row justify-center items-center mt-5">
+            <Text className="text-gray-600 text-sm" style={{ fontFamily: 'Poppins_400Regular' }}>
+              New to EduSync?{' '}
             </Text>
-            <View className="flex-1 h-px bg-gray-300" />
-          </View>
-
-          <TouchableOpacity
-            className="flex-row items-center justify-center h-12 bg-white border border-gray-300 rounded-lg mb-5"
-            onPress={() => Alert.alert('Google Login', 'This would initiate Google Sign-in')}
-          >
-            <Text className="text-xl font-bold text-[#4285F4] mr-2.5">G</Text>
-            <Text className="text-lg text-gray-600 font-medium" style={{ fontFamily: 'Poppins_500Medium' }}>
-              Google
-            </Text>
-          </TouchableOpacity>
-
-          <View className="flex-row justify-center items-center py-2.5 mt-2.5">
-            <Text className="text-gray-600 text-base" style={{ fontFamily: 'Poppins_400Regular' }}>
-              Don't have an account?{' '}
-            </Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
-              <Text className="text-[#1E90FF] text-base ml-1" style={{ fontFamily: 'Poppins_600SemiBold' }}>
-                Register
+            <TouchableOpacity onPress={() => router.push('/register')}>
+              <Text className="text-[#1E90FF] text-sm font-semibold" style={{ fontFamily: 'Poppins_600SemiBold' }}>
+                Register now
               </Text>
             </TouchableOpacity>
           </View>

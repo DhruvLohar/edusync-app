@@ -1,38 +1,25 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, Dimensions, Animated, Easing, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import AnimatedReanimated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 
-import AttendanceList from '../../../../components/custom/BLE/AttendanceList'; // The list component
+import AttendanceList from '../../../../components/custom/BLE/AttendanceList';
 import { fetchFromAPI, postToAPI } from '~/lib/api';
 import { Attendance, Class } from '~/type/Teacher';
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const INITIAL_HEIGHT = SCREEN_HEIGHT * 0.50; // Initial sheet height
-const MAX_HEIGHT = SCREEN_HEIGHT * 0.90;    // Max sheet height
-const MIN_HEIGHT = SCREEN_HEIGHT * 0.20;    // Min sheet height
-
-// --- MOCK DATA ---
-const mockCourses = [
-  { id: 'c1', name: 'Blockchain Systems', sem: 'SEM 7' },
-  { id: 'c2', name: 'Network Security', sem: 'SEM 7' },
-  { id: 'c3', name: 'Distributed Ledgers', sem: 'SEM 6' },
-  { id: 'c4', name: 'Advanced Algorithms', sem: 'SEM 5' },
-];
+import { BottomModal } from '../../../../components/ui/BottomModal';
 
 interface CourseSelectionProps {
   classes: Class[];
-  onSelect: (courseId: Class | null) => void;
+  onSelect: (course: Class) => void;
+  isVisible: boolean;
 }
 
-const CourseSelectionModal: React.FC<CourseSelectionProps> = ({ classes, onSelect }) => {
+
+const CourseSelectionModal: React.FC<CourseSelectionProps> = ({ classes, onSelect, isVisible }) => {
   return (
     <Modal
       animationType="slide"
       transparent={true}
-      visible={true}
+      visible={isVisible}
     >
       <View style={styles.modalOverlay}>
         <View className="bg-white rounded-t-3xl w-full p-6 shadow-2xl absolute bottom-0" style={{ height: '75%' }}>
@@ -62,11 +49,14 @@ const CourseSelectionModal: React.FC<CourseSelectionProps> = ({ classes, onSelec
 };
 
 
-const TeacherBeaconSession: React.FC<{ selectedCourse: Class | null }> = ({ selectedCourse }) => {
-  const router = useRouter();
+interface BeaconSessionProps {
+  selectedCourse: Class;
+}
 
-  const [isSessionActive, setIsSessionActive] = useState<boolean>(false);
-  const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
+const BeaconSession: React.FC<BeaconSessionProps> = ({ selectedCourse }) => {
+  const [isSessionActive, setIsSessionActive] = useState(false);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [attendance, setAttendance] = useState<Attendance | null>(null);
 
   const animatedScale = useRef(new Animated.Value(0)).current;
   const animatedOpacity = useRef(new Animated.Value(1)).current;
@@ -76,8 +66,18 @@ const TeacherBeaconSession: React.FC<{ selectedCourse: Class | null }> = ({ sele
     animatedOpacity.setValue(1);
     Animated.loop(
       Animated.parallel([
-        Animated.timing(animatedScale, { toValue: 1, duration: 1500, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-        Animated.timing(animatedOpacity, { toValue: 0, duration: 1500, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+        Animated.timing(animatedScale, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(animatedOpacity, {
+          toValue: 0,
+          duration: 1500,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
       ])
     ).start();
   };
@@ -96,188 +96,300 @@ const TeacherBeaconSession: React.FC<{ selectedCourse: Class | null }> = ({ sele
     return () => stopPumpingAnimation();
   }, [isSessionActive]);
 
-  const sheetY = useSharedValue(INITIAL_HEIGHT);
-  const context = useSharedValue(0);
 
-  const gesture = Gesture.Pan()
-    .onStart(() => {
-      context.value = sheetY.value;
-    })
-    .onUpdate((event) => {
-      sheetY.value = Math.min(
-        MAX_HEIGHT,
-        Math.max(MIN_HEIGHT, context.value - event.translationY)
-      );
-    })
-    .onEnd(() => {
-      if (sheetY.value > INITIAL_HEIGHT + 50) {
-        sheetY.value = withSpring(MAX_HEIGHT, { damping: 50, stiffness: 200 });
-      } else {
-        sheetY.value = withSpring(INITIAL_HEIGHT, { damping: 50, stiffness: 200 });
+  const startAttendanceSession = async () => {
+    try {
+      const res = await postToAPI('/teachers/start-attendance', { class_id: selectedCourse?.id });
+      // DUMMY DATA
+      // const res = {
+      //   success: true,
+      //   data: {
+      //     id: 1,
+      //     live_id: 'live_session_12345',
+      //     class_id: selectedCourse?.id,
+      //     class: selectedCourse,
+      //     start_time: new Date().toISOString(),
+      //     attendance_records: []
+      //   }
+      // };
+
+      if (res.success) {
+        setAttendance(res.data);
+        setIsSessionActive(true);
+        return true;
       }
-    });
+      return false;
+    } catch (error) {
+      Alert.alert('Error', 'Failed to start session');
+      return false;
+    }
+  };
 
-  const animatedSheetStyle = useAnimatedStyle(() => {
-    return {
-      height: sheetY.value,
-      transform: [{ translateY: SCREEN_HEIGHT - sheetY.value }],
-    };
-  });
+  const endAttendanceSession = async () => {
+    try {
+      if (!attendance?.live_id) {
+        Alert.alert('Error', 'No active session');
+        return false;
+      }
 
-  const handleEndSession = async () => {
-
-    if (attendance?.live_id) {
-      const res = await postToAPI('/teachers/end-attendance', {
-        attendance_id: attendance.id,
-      });
+      const res = await postToAPI('/teachers/end-attendance', { attendance_id: attendance.id });
+      // DUMMY DATA
+      // const res = { success: true };
 
       if (res.success) {
         setIsSessionActive(false);
-        setIsTransitioning(false);
-        sheetY.value = withSpring(INITIAL_HEIGHT);
-      } else {
-        Alert.alert('Error', 'Failed to end attendance session. Please try again.');
+        setIsModalVisible(false);
+        setAttendance(null);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      Alert.alert('Error', 'Failed to end session');
+      return false;
+    }
+  };
+
+
+  const handleBluetoothPress = async () => {
+    if (!isSessionActive && !isModalVisible) {
+      const success = await startAttendanceSession();
+      if (success) {
+        setIsModalVisible(true);
       }
     } else {
-      Alert.alert('Error', 'No active attendance session found.');
+      setIsModalVisible(true);
     }
   };
+
+  const handleCloseModal = () => {
+    setIsModalVisible(false);
+  };
+
+  
+
+  const rippleScale = animatedScale.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 2.5],
+  });
+
+  const rippleOpacity = animatedOpacity.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+
+  const rippleScale2 = animatedScale.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1.2, 2.7],
+  });
+
+  const rippleOpacity2 = animatedOpacity.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.5],
+  });
+
+  const rippleScale3 = animatedScale.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1.5, 3.0],
+  });
+
+  const rippleOpacity3 = animatedOpacity.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.3],
+  });
+
 
   const titleText = isSessionActive ? 'Active Session' : 'Tap to Start';
+  const bgColor = isSessionActive ? '#1a2a3a' : '#D3EDFF';
+  const statusBarStyle = isSessionActive ? 'light-content' : 'dark-content';
 
-  const rippleScale = animatedScale.interpolate({ inputRange: [0, 1], outputRange: [1, 2.5] });
-  const rippleOpacity = animatedOpacity.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
-
-  // api calls
-
-  const [attendance, setAttendance] = useState<Attendance | null>(null);
-
-  async function startAttendance() {
-    const res = await postToAPI('/teachers/start-attendance', {
-      class_id: selectedCourse?.id,
-    });
-
-    if (res.success) {
-      console.log(res.data);
-      setAttendance(res.data);
-    }
-  }
-
-  const handleTapToStart = () => {
-    if (!isSessionActive && !isTransitioning) {
-      startAttendance();
-      setIsTransitioning(true);
-      setTimeout(() => {
-        setIsSessionActive(true);
-        setIsTransitioning(false);
-      }, 2000);
-    }
-  };
-
+  
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: isSessionActive ? '#1a2a3a' : '#D3EDFF' }}>
-      <StatusBar barStyle={isSessionActive ? "light-content" : "dark-content"} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: bgColor }}>
+      <StatusBar barStyle={statusBarStyle as any} />
 
-      <View style={{ flex: 1, backgroundColor: isSessionActive ? '#1a2a3a' : '#D3EDFF', marginTop: 0 }}>
+      {/* HEADER */}
+      <View className="flex-row justify-between items-center p-4 pt-10">
+        <View>
+          <Text className={`text-base ${isSessionActive ? 'text-gray-300' : 'text-gray-800'} opacity-80`}>
+            Prof. Satish Ket
+          </Text>
+          <Text
+            className={`text-xl ${isSessionActive ? 'text-white' : 'text-gray-800'}`}
+            style={{ fontFamily: 'Poppins_600SemiBold' }}
+          >
+            {selectedCourse?.subject}
+          </Text>
+        </View>
+        <TouchableOpacity className="p-2 border rounded-full">
+          <Ionicons
+            name="settings-outline"
+            size={24}
+            color={isSessionActive ? 'white' : 'black'}
+          />
+        </TouchableOpacity>
+      </View>
 
-        <View className="flex-row justify-between items-center p-4 pt-10">
-          <View>
-            <Text className={`text-base ${isSessionActive ? 'text-gray-300' : 'text-gray-800'} opacity-80`}>Prof. Satish Ket</Text>
-            <Text className={`text-xl ${isSessionActive ? 'text-white' : 'text-gray-800'}`} style={{ fontFamily: 'Poppins_600SemiBold' }}>{selectedCourse?.subject}</Text>
-          </View>
-          <TouchableOpacity className={`p-2 border rounded-full`}>
-            <Ionicons name="settings-outline" size={24} color={isSessionActive ? 'white' : 'black'} />
+      {/* MAIN CONTENT */}
+      <View className="flex-col items-center" style={{ flex: 1 }}>
+        {/* TITLE SECTION */}
+        <View className="items-center mb-20 mt-16">
+          <Text
+            className={`text-4xl font-light ${isSessionActive ? 'text-white' : 'text-gray-800'} mb-2`}
+            style={{ fontFamily: 'Poppins_500Medium' }}
+          >
+            {titleText}
+          </Text>
+          <Text
+            className={`text-base text-center ${isSessionActive ? 'text-gray-300' : 'text-gray-600'} opacity-90`}
+            style={{ fontFamily: 'Poppins_400Regular', maxWidth: '70%' }}
+          >
+            Make your class presence count—activate the beacon!
+          </Text>
+        </View>
+
+        {/* RIPPLE & BLUETOOTH BUTTON */}
+        <View className="relative items-center justify-center" style={{ marginTop: '5%', marginBottom: 10 }}>
+          {/* Animated Ripple Circles When Active */}
+          {isSessionActive && (
+            <>
+              <Animated.View
+                className="absolute w-64 h-64 rounded-full border-2 border-[#0095FF]"
+                style={{
+                  opacity: rippleOpacity,
+                  transform: [{ scale: rippleScale }],
+                }}
+              />
+              <Animated.View
+                className="absolute w-52 h-52 rounded-full border-2 border-[#0095FF]"
+                style={{
+                  opacity: rippleOpacity2,
+                  transform: [{ scale: rippleScale2 }],
+                }}
+              />
+              <Animated.View
+                className="absolute w-40 h-40 rounded-full border-2 border-[#0095FF]"
+                style={{
+                  opacity: rippleOpacity3,
+                  transform: [{ scale: rippleScale3 }],
+                }}
+              />
+            </>
+          )}
+
+          {/* Static Circles When Inactive */}
+          {!isSessionActive && (
+            <>
+              <View className="absolute w-64 h-64 rounded-full border-2 border-[#0095FF]" style={{ opacity: 0.2 }} />
+              <View className="absolute w-52 h-52 rounded-full border-2 border-[#0095FF]" style={{ opacity: 0.3 }} />
+              <View className="absolute w-40 h-40 rounded-full border-2 border-[#0095FF]" style={{ opacity: 0.5 }} />
+            </>
+          )}
+
+          {/* Bluetooth Button */}
+          <TouchableOpacity
+            onPress={handleBluetoothPress}
+            className="w-20 h-20 rounded-full bg-[#0095FF] items-center justify-center shadow-lg"
+          >
+            <MaterialCommunityIcons name="bluetooth" size={30} color="white" />
           </TouchableOpacity>
         </View>
-
-        <View className="flex-col items-center" style={{ flex: 1 }}>
-
-          <View className="items-center mb-20 mt-16">
-            <Text className={`text-4xl font-light ${isSessionActive ? 'text-white' : 'text-gray-800'} mb-2`} style={{ fontFamily: 'Poppins_500Medium' }}>{titleText}</Text>
-            <Text className={`text-base text-center ${isSessionActive ? 'text-gray-300' : 'text-gray-600'} opacity-90`} style={{ fontFamily: 'Poppins_400Regular', maxWidth: '70%' }}>
-              Make your class presence count—activate the beacon!
-            </Text>
-          </View>
-
-          <View className="relative items-center justify-center " style={{ marginTop: '5%', marginBottom: 10 }}>
-
-            {isSessionActive || isTransitioning ? (
-              <>
-                <Animated.View className="absolute w-64 h-64 rounded-full border-2 border-[#0095FF]" style={{ opacity: isSessionActive ? rippleOpacity : 0.2, transform: [{ scale: isSessionActive ? rippleScale : 1 }] }} />
-                <Animated.View className="absolute w-52 h-52 rounded-full border-2 border-[#0095FF]" style={{ opacity: isSessionActive ? rippleOpacity.interpolate({ inputRange: [0, 1], outputRange: [0, 0.5] }) : 0.3, transform: [{ scale: isSessionActive ? animatedScale.interpolate({ inputRange: [0, 1], outputRange: [1.2, 2.7] }) : 1 }] }} />
-                <Animated.View className="absolute w-40 h-40 rounded-full border-2 border-[#0095FF]" style={{ opacity: isSessionActive ? rippleOpacity.interpolate({ inputRange: [0, 1], outputRange: [0, 0.3] }) : 0.5, transform: [{ scale: isSessionActive ? animatedScale.interpolate({ inputRange: [0, 1], outputRange: [1.5, 3.0] }) : 1 }] }} />
-              </>
-            ) : (
-              <>
-                <View className="absolute w-64 h-64 rounded-full border-2 border-[#0095FF]" style={{ opacity: 0.2 }} />
-                <View className="absolute w-52 h-52 rounded-full border-2 border-[#0095FF]" style={{ opacity: 0.3 }} />
-                <View className="absolute w-40 h-40 rounded-full border-2 border-[#0095FF]" style={{ opacity: 0.5 }} />
-              </>
-            )}
-
-            <TouchableOpacity
-              onPress={handleTapToStart}
-              disabled={isSessionActive || isTransitioning}
-              className="w-20 h-20 rounded-full bg-[#0095FF] items-center justify-center shadow-lg">
-              <MaterialCommunityIcons name="bluetooth" size={30} color="white" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {(isTransitioning || isSessionActive) && (
-          <GestureDetector gesture={gesture}>
-            <AnimatedReanimated.View
-              style={[
-                { position: 'absolute', width: '100%', top: 0 },
-                animatedSheetStyle,
-                { zIndex: 1000 }
-              ]}
-            >
-              <AttendanceList
-                isScanning={!isSessionActive}
-                isSessionActive={isSessionActive}
-                onEndSession={handleEndSession}
-                sheetY={sheetY}
-                attendance={attendance}
-                students={selectedCourse?.students || []}
-              />
-            </AnimatedReanimated.View>
-          </GestureDetector>
-        )}
       </View>
+
+      {/* BOTTOM MODAL SHEET */}
+      <BottomModal isVisible={isModalVisible} onClose={handleCloseModal}>
+        <AttendanceList
+          isScanning={!isSessionActive}
+          isSessionActive={isSessionActive}
+          onEndSession={endAttendanceSession}
+          sheetY={null}
+          attendance={attendance}
+          students={selectedCourse?.students || []}
+        />
+      </BottomModal>
     </SafeAreaView>
   );
 };
 
 
-const BeaconScreen: React.FC = () => {
+
+const AddAttendanceScreen: React.FC = () => {
   const [selectedCourse, setSelectedCourse] = useState<Class | null>(null);
-
-  const handleCourseSelect = (courseId: Class | null) => {
-    setSelectedCourse(courseId);
-  };
-
   const [classes, setClasses] = useState<Class[]>([]);
 
-  async function fetchClasses() {
-    const res = await fetchFromAPI('/teachers/fetch-classes');
-
-    if (res.success) {
-      setClasses(res.data);
-    }
-  }
 
   useEffect(() => {
     fetchClasses();
-  }, [])
+  }, []);
+
+
+  const fetchClasses = async () => {
+    try {
+    const res = await fetchFromAPI('/teachers/fetch-classes');
+      // DUMMY DATA
+      // const res = {
+      //   success: true,
+      //   data: [
+      //     {
+      //       id: 1,
+      //       name: 'Database Systems',
+      //       code: 'CS301',
+      //       semester: 7,
+      //       students: 50,
+      //       subject: 'Database Systems',
+      //       department: 'CSE'
+      //     },
+      //     {
+      //       id: 2,
+      //       name: 'Web Development',
+      //       code: 'CS302',
+      //       semester: 7,
+      //       students: 45,
+      //       subject: 'Web Development',
+      //       department: 'CSE'
+      //     },
+      //     {
+      //       id: 3,
+      //       name: 'AI & ML',
+      //       code: 'CS303',
+      //       semester: 7,
+      //       students: 40,
+      //       subject: 'AI & ML',
+      //       department: 'CSE'
+      //     }
+      //   ]
+      // };
+
+      if (res.success) {
+        setClasses(res.data);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to fetch classes');
+    }
+  };
+
+ 
+
+  const handleSelectCourse = (course: Class) => {
+    setSelectedCourse(course);
+  };
+
 
   if (!selectedCourse) {
-    return <CourseSelectionModal classes={classes} onSelect={handleCourseSelect} />;
+    return (
+      <>
+        <CourseSelectionModal
+          classes={classes}
+          onSelect={handleSelectCourse}
+          isVisible={true}
+        />
+      </>
+    );
   }
 
-  return <TeacherBeaconSession selectedCourse={selectedCourse} />;
+  return <BeaconSession selectedCourse={selectedCourse} />;
 };
+
 
 const styles = StyleSheet.create({
   modalOverlay: {
@@ -287,5 +399,4 @@ const styles = StyleSheet.create({
   },
 });
 
-
-export default BeaconScreen;
+export default AddAttendanceScreen;

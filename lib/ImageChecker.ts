@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { decode as atob } from 'base-64';
 import { useResizePlugin } from 'vision-camera-resize-plugin';
 import { decode as jpegDecode } from 'jpeg-js';
+import { API_URL } from './api';
 
 interface EmbeddingResult {
   embedding: number[];
@@ -14,6 +15,10 @@ const EMBEDDING_STORAGE_KEY = '@face_embedding:';
 
 export function useFaceNetModel() {
   return useTensorflowModel(require('../assets/models/facenet_model(4).tflite'));
+}
+
+export function renderAPIImage(uri: string) {
+  return uri.replace('http://127.0.0.1:8000', API_URL);
 }
 
 export function useFaceNetResize() {

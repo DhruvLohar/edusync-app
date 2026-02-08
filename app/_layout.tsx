@@ -33,7 +33,7 @@ export default function RootLayout() {
   });
 
   // Toggle this for testing - set to true to test logged-in state
-  const isLoggedIn = true; // Change to: !!(session && profile) for production
+  const isLoggedIn = !!(session && profile); // Change to: !!(session && profile) for production
 
   async function checkSession() {
     await rehydrateSession();
@@ -43,7 +43,7 @@ export default function RootLayout() {
     if (fontsLoaded) {
       SplashScreen.hideAsync().catch(console.warn);
       // Uncomment for production:
-      // checkSession();
+      checkSession();
     }
   }, [fontsLoaded]);
 

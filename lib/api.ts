@@ -22,13 +22,22 @@ interface ApiResponse<T = any> {
 export async function postToAPI<T>(
     url: string,
     data: any,
-    sendingFile: boolean = false
+    sendingFile: boolean = false,
+    auth: boolean = false
 ): Promise<ApiResponse<T> | any> {
     try {
+        let headers: { [key: string]: string } = {
+            'Content-Type': sendingFile ? 'multipart/form-data' : 'application/json',
+        };
+        if (auth) {
+            const sessionString = await SecureStore.getItemAsync('session');
+            const session: Session = sessionString ? JSON.parse(sessionString) : {};
+            if (session.access_token) {
+                headers['Authorization'] = `Bearer ${session.access_token}`;
+            }
+        }
         const res: AxiosResponse<ApiResponse<T>> = await axios.post(url, data, {
-            headers: {
-                'Content-Type': sendingFile ? 'multipart/form-data' : 'application/json',
-            },
+            headers,
         });
         return res.data;
     } catch (err: any) {
