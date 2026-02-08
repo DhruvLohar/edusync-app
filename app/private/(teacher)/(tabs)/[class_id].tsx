@@ -1,17 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, SafeAreaView, StatusBar, Dimensions, Animated, Easing, Modal, ScrollView, StyleSheet, Alert } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import AttendanceList from '../../../../components/custom/BLE/AttendanceList';
 import { fetchFromAPI, postToAPI } from '~/lib/api';
 import { Attendance, Class } from '~/type/Teacher';
 import { BottomModal } from '../../../../components/ui/BottomModal';
+import dummyTeacherData from '~/assets/dummy-teacher.json';
 
 interface CourseSelectionProps {
   classes: Class[];
   onSelect: (course: Class) => void;
   isVisible: boolean;
 }
+
 
 
 const CourseSelectionModal: React.FC<CourseSelectionProps> = ({ classes, onSelect, isVisible }) => {
@@ -49,12 +52,38 @@ const CourseSelectionModal: React.FC<CourseSelectionProps> = ({ classes, onSelec
 };
 
 
-interface BeaconSessionProps {
-  selectedCourse: Class;
+/** Map dummy-teacher lecture to Class-like for BeaconSession / API */
+function lectureToClass(lecture: {
+  id: number;
+  classId: string;
+  subject: string;
+  department: string;
+  code: string;
+  room?: string;
+  startTime: string;
+  endTime: string;
+}): Class {
+  return {
+    id: lecture.id,
+    subject: lecture.subject,
+    department: lecture.department as Class['department'],
+    year: lecture.code as Class['year'],
+    teacher_id: 0,
+    created_at: new Date(),
+    updated_at: new Date(),
+    students: [],
+  };
 }
 
-const BeaconSession: React.FC<BeaconSessionProps> = ({ selectedCourse }) => {
+interface BeaconSessionProps {
+  selectedCourse: Class;
+  showBackButton?: boolean;
+  onBack?: () => void;
+}
+
+const BeaconSession: React.FC<BeaconSessionProps> = ({ selectedCourse, showBackButton, onBack }) => {
   const [isSessionActive, setIsSessionActive] = useState(false);
+  const [sessionEnded, setSessionEnded] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [attendance, setAttendance] = useState<Attendance | null>(null);
 
@@ -138,8 +167,8 @@ const BeaconSession: React.FC<BeaconSessionProps> = ({ selectedCourse }) => {
 
       if (res.success) {
         setIsSessionActive(false);
-        setIsModalVisible(false);
         setAttendance(null);
+        setSessionEnded(true);
         return true;
       }
       return false;
@@ -162,6 +191,12 @@ const BeaconSession: React.FC<BeaconSessionProps> = ({ selectedCourse }) => {
   };
 
   const handleCloseModal = () => {
+    setIsModalVisible(false);
+    setSessionEnded(false);
+  };
+
+  const handleRecognizeStudent = () => {
+    setSessionEnded(false);
     setIsModalVisible(false);
   };
 
@@ -209,25 +244,30 @@ const BeaconSession: React.FC<BeaconSessionProps> = ({ selectedCourse }) => {
       <StatusBar barStyle={statusBarStyle as any} />
 
       {/* HEADER */}
-      <View className="flex-row justify-between items-center p-4 pt-10">
-        <View>
-          <Text className={`text-base ${isSessionActive ? 'text-gray-300' : 'text-gray-800'} opacity-80`}>
-            Prof. Satish Ket
-          </Text>
-          <Text
-            className={`text-xl ${isSessionActive ? 'text-white' : 'text-gray-800'}`}
-            style={{ fontFamily: 'Poppins_600SemiBold' }}
-          >
-            {selectedCourse?.subject}
-          </Text>
+      <View className="flex-row justify-between items-center p-4 pt-10 mt-5">
+        <View className="flex-row items-center flex-1">
+          {showBackButton && onBack && !isSessionActive && (
+            <TouchableOpacity onPress={onBack} className="p-2 mr-2 -ml-1 rounded-full">
+              <Ionicons
+                name="chevron-back"
+                size={24}
+                color="black"
+              />
+            </TouchableOpacity>
+          )}
+          <View className='ml-3'>
+            <Text className={`text-base ${isSessionActive ? 'text-gray-300' : 'text-gray-800'} opacity-80`}>
+              {selectedCourse?.department} | {selectedCourse?.year ?? selectedCourse?.subject}
+            </Text>
+            <Text
+              className={`text-xl ${isSessionActive ? 'text-white' : 'text-gray-800'}`}
+              style={{ fontFamily: 'Poppins_600SemiBold' }}
+            >
+              {selectedCourse?.subject}
+            </Text>
+          </View>
         </View>
-        <TouchableOpacity className="p-2 border rounded-full">
-          <Ionicons
-            name="settings-outline"
-            size={24}
-            color={isSessionActive ? 'white' : 'black'}
-          />
-        </TouchableOpacity>
+
       </View>
 
       {/* MAIN CONTENT */}
@@ -299,9 +339,11 @@ const BeaconSession: React.FC<BeaconSessionProps> = ({ selectedCourse }) => {
       {/* BOTTOM MODAL SHEET */}
       <BottomModal isVisible={isModalVisible} onClose={handleCloseModal}>
         <AttendanceList
-          isScanning={!isSessionActive}
+          isScanning={!isSessionActive && !sessionEnded}
           isSessionActive={isSessionActive}
+          sessionEnded={sessionEnded}
           onEndSession={endAttendanceSession}
+          onRecognizeStudent={handleRecognizeStudent}
           sheetY={null}
           attendance={attendance}
           students={selectedCourse?.students || []}
@@ -313,15 +355,38 @@ const BeaconSession: React.FC<BeaconSessionProps> = ({ selectedCourse }) => {
 
 
 
+type TeacherLectureDummy = {
+  id: number;
+  subject: string;
+  department: string;
+  code: string;
+  classId: string;
+  room?: string;
+  startTime: string;
+  endTime: string;
+  isOngoing: boolean;
+};
+
 const AddAttendanceScreen: React.FC = () => {
+  const { class_id: routeClassId } = useLocalSearchParams<{ class_id?: string }>();
+  const router = useRouter();
   const [selectedCourse, setSelectedCourse] = useState<Class | null>(null);
   const [classes, setClasses] = useState<Class[]>([]);
+  const [fromRoute, setFromRoute] = useState(false);
 
+  const todayLectures = (dummyTeacherData as { todayLectures?: TeacherLectureDummy[] }).todayLectures ?? [];
 
   useEffect(() => {
+    if (routeClassId && todayLectures.length > 0) {
+      const lecture = todayLectures.find((l) => l.classId === String(routeClassId));
+      if (lecture) {
+        setSelectedCourse(lectureToClass(lecture));
+        setFromRoute(true);
+        return;
+      }
+    }
     fetchClasses();
-  }, []);
-
+  }, [routeClassId]);
 
   const fetchClasses = async () => {
     try {
@@ -387,7 +452,14 @@ const AddAttendanceScreen: React.FC = () => {
     );
   }
 
-  return <BeaconSession selectedCourse={selectedCourse} />;
+  return (
+    <BeaconSession
+      key={selectedCourse.id}
+      selectedCourse={selectedCourse}
+      showBackButton={fromRoute}
+      onBack={fromRoute ? () => router.back() : undefined}
+    />
+  );
 };
 
 

@@ -4,6 +4,8 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient'; 
 import { fetchFromAPI } from '~/lib/api';
 import { renderAPIImage } from '~/lib/ImageChecker';
+import { BottomModal } from '~/components/ui/BottomModal';
+import LectureCards from '~/components/custom/teacherHome/LectureCards';
 
 // --- MOCK DATA ---
 interface ClassAttendance {
@@ -17,30 +19,6 @@ interface ClassAttendance {
     progress: number; // 0.0 to 1.0
 }
 
-const mockClasses: ClassAttendance[] = [
-    {
-        id: 'c1',
-        name: 'Blockchain',
-        department: 'CSE',
-        time: '9:00 - 10:00 AM',
-        date: '22 Oct 2025',
-        presentCount: 42,
-        totalCapacity: 60,
-        progress: 0.7,
-    },
-    {
-        id: 'c2',
-        name: 'Data Structures',
-        department: 'IT',
-        time: '11:00 - 12:00 AM',
-        date: '28 Oct 2025',
-        presentCount: 58,
-        totalCapacity: 75,
-        progress: 0.8,
-    },
-];
-
-// --- REUSABLE ATTENDANCE CARD COMPONENT ---
 const AttendanceCard: React.FC<ClassAttendance> = ({ name, department, time, date, presentCount, progress }) => {
     const progressWidth = `${progress * 100}%`;
     
@@ -109,25 +87,12 @@ const HomeScreen: React.FC = () => {
     const [classes, setClasses] = useState<ClassAttendance[]>([]);
     const [teacherName, setTeacherName] = useState<string>('');
     const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
+    const [isAttendanceModalVisible, setIsAttendanceModalVisible] = useState(false);
 
     useEffect(() => {
         // Fetch teacher profile for name and photo
         const fetchProfile = async () => {
            const res = await fetchFromAPI<any>('/users/profile');
-            // DUMMY DATA
-            // const res = {
-            //   success: true,
-            //   data: {
-            //     id: 1,
-            //     name: 'Dr. John Smith',
-            //     email: 'john.smith@example.com',
-            //     phone: '+91-9876543210',
-            //     user_type: 'teacher',
-            //     employee_id: 'EMP001',
-            //     department: 'Computer Science',
-            //     profile_photo: 'https://via.placeholder.com/150'
-            //   }
-            // };
             if (res && res.success && res.data) {
                 setTeacherName(res.data.name || 'Teacher');
                 let url = renderAPIImage(res.data.profile_photo);
@@ -141,33 +106,6 @@ const HomeScreen: React.FC = () => {
         // Fetch teacher attendance history
         const fetchHistory = async () => {
            const res = await fetchFromAPI<any>('/teachers/history');
-            // DUMMY DATA
-            // const res = {
-            //   success: true,
-            //   data: [
-            //     {
-            //       id: 1,
-            //       class: { id: 1, name: 'Database Systems', code: 'CS301', semester: 7 },
-            //       start_time: '2025-01-28 10:00 AM',
-            //       end_time: '2025-01-28 11:00 AM',
-            //       summary: { total_students: 50, total_present: 48 }
-            //     },
-            //     {
-            //       id: 2,
-            //       class: { id: 2, name: 'Web Development', code: 'CS302', semester: 7 },
-            //       start_time: '2025-01-27 02:00 PM',
-            //       end_time: '2025-01-27 03:00 PM',
-            //       summary: { total_students: 45, total_present: 43 }
-            //     },
-            //     {
-            //       id: 3,
-            //       class: { id: 3, name: 'AI & ML', code: 'CS303', semester: 7 },
-            //       start_time: '2025-01-26 11:00 AM',
-            //       end_time: '2025-01-26 12:00 PM',
-            //       summary: { total_students: 40, total_present: 38 }
-            //     }
-            //   ]
-            // };
             if (res && res.success && Array.isArray(res.data)) {
                 // Map backend data to ClassAttendance[]
                 const mapped = res.data.map((attendance: any) => {
@@ -210,22 +148,10 @@ const HomeScreen: React.FC = () => {
     return (
         <SafeAreaView className="flex-1 bg-white"> 
             <StatusBar barStyle="dark-content" />
-            <ScrollView className="flex-1 px-5" showsVerticalScrollIndicator={false}>
-                {/* Header (Greeting & Settings Icon) */}
-                <View className="flex-row justify-between items-center py-4 mt-8">
-                    {/* User Profile Photo */}
-                    {profilePhoto ? (
-                        <Image source={{ uri: profilePhoto }} className="w-12 h-12 rounded-full border-2 border-white shadow-sm" style={{ width: 48, height: 48, borderRadius: 24 }} />
-                    ) : (
-                        <View className="w-12 h-12 rounded-full bg-gray-200 border-2 border-white shadow-sm" />
-                    )}
-                    <TouchableOpacity className="p-2 border border-gray-300 rounded-full">
-                        <Ionicons name="settings-outline" size={24} color="black" />
-                    </TouchableOpacity>
-                </View>
-
-                {/* Greeting Text */}
-                <View className="mb-8">
+            <ScrollView className="flex-1  mt-5 bg-[#D3EDFF]" showsVerticalScrollIndicator={false}>
+               
+                <View className="flex-row justify-between items-center py-4 mt-8 px-5">
+                    <View className="mb-8">
                     <Text className="text-2xl text-gray-600 mb-1" style={{ fontFamily: 'Poppins_400Regular' }}>
                         {greeting}
                     </Text>
@@ -233,10 +159,37 @@ const HomeScreen: React.FC = () => {
                         {teacherName}
                     </Text>
                 </View>
+                    {profilePhoto ? (
+                        <Image source={{ uri: profilePhoto }} className="w-12 h-12 rounded-full border-2 border-white shadow-sm" style={{ width: 48, height: 48, borderRadius: 24 }} />
+                    ) : (
+                        <View className="w-24 h-24 rounded-full bg-gray-200 border-2 border-white shadow-sm" />
+                    )}
+                </View>
+
+                <View className="px-5 mt-6 mb-6">
+          <TouchableOpacity
+            onPress={() => setIsAttendanceModalVisible(true)}
+            className="w-full bg-[#0095FF] rounded-full py-4 items-center justify-center"
+            activeOpacity={0.7}
+          >
+            <View className="flex-row items-center gap-2">
+              <Text
+                className="text-lg text-white font-semibold"
+                style={{ fontFamily: 'Poppins_600SemiBold' }}
+              >
+                Take Attendance
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+                
+                
 
                 {/* Today's Attendance Header */}
-                <View className="flex-row justify-between items-center mb-4 mt-4">
-                    <Text className="text-lg text-gray-700" style={{ fontFamily: 'Poppins_500Medium' }}>
+                <View className='bg-white rounded-t-[50px] p-4 mt-5 px-7'>
+                <View className="flex-row justify-between items-center mb-4 mt-4 px-5">
+                    <Text className="text-xl text-gray-700 mt-3 mb-3" style={{ fontFamily: 'Poppins_500Medium' }}>
                         Attendance History
                     </Text>
                 </View>
@@ -252,7 +205,22 @@ const HomeScreen: React.FC = () => {
 
                 {/* Extra padding to ensure last card is visible above the tab bar */}
                 <View className="h-20" /> 
+                </View>
             </ScrollView>
+            <BottomModal
+        isVisible={isAttendanceModalVisible}
+        onClose={() => setIsAttendanceModalVisible(false)}
+      >
+        <View className="mb-4 px-4">
+          <Text
+            className="text-2xl text-gray-900 mt-4"
+            style={{ fontFamily: 'Poppins_600SemiBold' }}
+          >
+            Today's Lectures
+          </Text>
+        </View>
+        <LectureCards />
+      </BottomModal>
         </SafeAreaView>
     );
 };

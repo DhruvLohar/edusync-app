@@ -1,0 +1,48 @@
+{
+    "todayLectures": [
+        {
+            "id": 1,
+            "subject": "Blockchain Lab",
+            "department": "CSE",
+            "code": "SEM7-A",
+            "classId": "1",
+            "room": "Lab 5",
+            "startTime": "10:00 AM",
+            "endTime": "11:00 AM",
+            "isOngoing": true
+        },
+        {
+            "id": 2,
+            "subject": "Advanced Cryptography",
+            "department": "CSE",
+            "code": "SEM7-A",
+            "classId": "2",
+            "room": "Lecture Hall 3",
+            "startTime": "11:15 AM",
+            "endTime": "12:15 PM",
+            "isOngoing": false
+        },
+        {
+            "id": 3,
+            "subject": "Smart Contracts Development",
+            "department": "CSE",
+            "code": "SEM7-A",
+            "classId": "3",
+            "room": "Lab 3",
+            "startTime": "02:00 PM",
+            "endTime": "03:00 PM",
+            "isOngoing": false
+        },
+        {
+            "id": 4,
+            "subject": "Web3 Fundamentals",
+            "department": "CSE",
+            "code": "SEM7-A",
+            "classId": "4",
+            "room": "Lecture Hall 2",
+            "startTime": "03:15 PM",
+            "endTime": "04:15 PM",
+            "isOngoing": false
+        }
+    ]
+}
