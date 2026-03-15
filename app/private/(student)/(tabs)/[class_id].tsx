@@ -32,6 +32,7 @@ import { fetchFromAPI } from '~/lib/api';
 import { Attendance } from '~/type/Teacher';
 import { useAuthStore } from '~/lib/store/auth.store';
 import { useStudentAttendance } from '~/lib/hook/useStudentAttendance';
+import { useAudio } from '~/lib/hook/useAudio';
 
 const SIMILARITY_THRESHOLD = 0.6;
 
@@ -58,11 +59,15 @@ const StudentHomeScreen: React.FC = () => {
   const device = useCameraDevice('front');
   const { hasPermission, requestPermission } = useCameraPermission();
 
+  // --- AUDIO HOOK ---
+  const { play: playSuccessSound } = useAudio(require('~/assets/success.mp3'));
+
   // Memoize callbacks to prevent infinite re-renders
   const onAlertReceived = useCallback(() => {
     console.log('✅ Attendance verified by teacher!');
+    playSuccessSound();
     setScanPhase('confirmed');
-  }, []);
+  }, [playSuccessSound]);
 
   const onCheckInSuccess = useCallback(() => {
     console.log('✅ BLE Check-in successful');
@@ -157,7 +162,7 @@ const StudentHomeScreen: React.FC = () => {
   // Interpolations for Ripple Effect
   const rippleScale = scaleAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [1, 2.5],  
+    outputRange: [1, 2.5],
   });
 
   const rippleOpacity = opacityAnim.interpolate({
@@ -168,7 +173,6 @@ const StudentHomeScreen: React.FC = () => {
   // --- HANDLERS ---
 
   const handleStartAttendance = useCallback(async () => {
-    // Check Permissions
     if (!hasPermission) {
       const permissionGranted = await requestPermission();
       if (!permissionGranted) {
@@ -176,12 +180,6 @@ const StudentHomeScreen: React.FC = () => {
         return;
       }
     }
-    // Check Registration
-    if (!registeredUser) {
-      Alert.alert('Not Registered', 'Please register your face profile first.');
-      return;
-    }
-    // Open Camera
     setScanPhase('camera');
   }, [hasPermission, requestPermission, registeredUser]);
 
@@ -199,28 +197,9 @@ const StudentHomeScreen: React.FC = () => {
       const photoUri = `file://${photo.path}`;
       setCapturedImageUri(photoUri);
 
-      // 2. Generate Embedding
-      const { embedding: capturedEmbedding } = await getFaceEmbedding(photoUri);
 
-      // 3. Load Stored Embedding
-      const storedEmbedding = await loadEmbedding(registeredUser!);
-      if (!storedEmbedding) throw new Error('No stored embedding found.');
-
-      // 4. Compare
-      const similarity = compareEmbeddings(capturedEmbedding, storedEmbedding);
-      const isMatch = similarity >= SIMILARITY_THRESHOLD;
-
-      if (isMatch || true) {
-        // Success: Close Camera, Go to Processing
-        setScanPhase('processing');
-        triggerServerProcess();
-      } else {
-        Alert.alert(
-          'Verification Failed',
-          'Face not recognized. Please try again.',
-          [{ text: 'OK', onPress: () => setCapturedImageUri(null) }]
-        );
-      }
+      setScanPhase('processing');
+      triggerServerProcess();
     } catch (error) {
       console.error('Face verify error:', error);
       Alert.alert('Error', 'Verification failed.');

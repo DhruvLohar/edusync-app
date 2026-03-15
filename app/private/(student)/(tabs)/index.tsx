@@ -7,26 +7,28 @@ import {
   StyleSheet,
   ScrollView,
   Image,
+  Modal,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { fetchFromAPI } from '~/lib/api';
 import { renderAPIImage } from '~/lib/ImageChecker';
 import AttendanceOverview from '~/components/custom/studentHome/AttendanceOverview';
 import TodaysLecture from '~/components/custom/studentHome/AttendanceHistory';
 import LectureCards from '~/components/custom/studentHome/LectureCards';
-import { BottomModal } from '~/components/ui/BottomModal';
 import type { AttendanceRecord } from '~/type/Student';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuthStore } from '~/lib/store/auth.store';
 
 
 // --- MAIN SCREEN COMPONENT ---
 const StudentHomeScreen: React.FC = () => {
+
+  const profile = useAuthStore((state) => state.profile);
   const [history, setHistory] = useState<AttendanceRecord[]>([]);
-  const [profile, setProfile] = useState<any>(null);
   const [isAttendanceModalVisible, setIsAttendanceModalVisible] = useState(false);
 
 
-  // --- ADDED: Fetch attendance history from backend ---
   useEffect(() => {
     const fetchHistory = async () => {
       const res = await fetchFromAPI<{ records: AttendanceRecord[] }>('/students/history');
@@ -38,21 +40,6 @@ const StudentHomeScreen: React.FC = () => {
     };
     fetchHistory();
   }, []);
-  // --- END ADDED ---
-
-  // --- ADDED: Fetch student profile on mount ---
-  useEffect(() => {
-    const fetchProfile = async () => {
-      const res = await fetchFromAPI<any>('/users/profile');
-      if (res && res.success && res.data) {
-        setProfile(res.data);
-      } else {
-        setProfile(null);
-      }
-    };
-    fetchProfile();
-  }, []);
-  // --- END ADDED ---
 
   return (
     <SafeAreaView className="flex-1">
@@ -112,21 +99,35 @@ const StudentHomeScreen: React.FC = () => {
         </View>
       </ScrollView>
 
-      {/* Bottom Sheet Modal for Attendance */}
-      <BottomModal
-        isVisible={isAttendanceModalVisible}
-        onClose={() => setIsAttendanceModalVisible(false)}
+      {/* Attendance Modal */}
+      <Modal
+        visible={isAttendanceModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setIsAttendanceModalVisible(false)}
       >
-        <View className="mb-4 px-4">
-          <Text
-            className="text-2xl text-gray-900 mt-4"
-            style={{ fontFamily: 'Poppins_600SemiBold' }}
-          >
-            Ongoing Lecture
-          </Text>
-        </View>
-        <LectureCards />
-      </BottomModal>
+        <SafeAreaView className="flex-1 bg-[#f0f8ff]">
+          {/* Modal Header */}
+          <View className="px-5 py-4 flex-row justify-between items-center bg-white border-b border-gray-200">
+            <Text
+              className="text-2xl text-gray-900"
+              style={{ fontFamily: 'Poppins_600SemiBold' }}
+            >
+              Ongoing Lecture
+            </Text>
+            <TouchableOpacity onPress={() => setIsAttendanceModalVisible(false)} className="p-2">
+              <Ionicons name="close" size={28} color="black" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Lectures List */}
+          <ScrollView className="flex-1">
+            <View className="py-4">
+              <LectureCards />
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 };

@@ -10,38 +10,6 @@ interface APIResponse {
   data: any;
 }
 
-/** Dummy student profile for development/demo */
-// export const DUMMY_STUDENT_PROFILE: User = {
-//   id: 1,
-//   name: 'Rahul Sharma',
-//   email: 'rahul.student@example.com',
-//   phone: '+91-9876543210',
-//   user_type: UserType.student,
-//   gr_no: 'CS2021001',
-//   department: Department.CSE,
-//   year: Year.BE,
-//   profile_photo: 'https://via.placeholder.com/150',
-//   is_active: true,
-//   onboarding_done: true,
-//   created_at: new Date(),
-//   updated_at: new Date(),
-// };
-
-/** Dummy teacher profile for development/demo */
-// export const DUMMY_TEACHER_PROFILE: User = {
-//   id: 2,
-//   name: 'Prof. Satish Ket',
-//   email: 'satish.teacher@example.com',
-//   phone: '+91-9876543211',
-//   user_type: UserType.teacher,
-//   employee_id: 'TCH001',
-//   profile_photo: 'https://via.placeholder.com/150',
-//   is_active: true,
-//   onboarding_done: true,
-//   created_at: new Date(),
-//   updated_at: new Date(),
-// };
-
 interface AuthState {
   session: { access_token: string; user_type?: string } | null;
   profile: User | null;

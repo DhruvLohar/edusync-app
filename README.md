@@ -1,1 +1,1 @@
-"# edusync-app" 
+# edusync-app

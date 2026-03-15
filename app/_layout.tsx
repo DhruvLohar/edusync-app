@@ -1,7 +1,7 @@
 import { useAuthStore } from '~/lib/store/auth.store';
 import '../global.css';
 
-import { SplashScreen, Stack, useRouter, useSegments } from 'expo-router';
+import { SplashScreen, Stack } from 'expo-router';
 import { useEffect } from 'react';
 import { 
   useFonts, 
@@ -20,9 +20,7 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  const router = useRouter();
-  const segments = useSegments();
-  const { profile, session, rehydrateSession, isSessionInitialized } = useAuthStore();
+  const { profile, session, rehydrateSession } = useAuthStore();
 
   const [fontsLoaded] = useFonts({
     Poppins_300Light,
@@ -32,36 +30,14 @@ export default function RootLayout() {
     Poppins_700Bold,
   });
 
-  // Toggle this for testing - set to true to test logged-in state
-  const isLoggedIn = !!(session && profile); // Change to: !!(session && profile) for production
-
-  async function checkSession() {
-    await rehydrateSession();
-  }
+  const isLoggedIn = !!(session && profile);
 
   useEffect(() => {
     if (fontsLoaded) {
       SplashScreen.hideAsync().catch(console.warn);
-      // Uncomment for production:
-      checkSession();
+      rehydrateSession();
     }
   }, [fontsLoaded]);
-
-  // // Simple navigation logic: logged in users go to private, others to onboarding
-  // useEffect(() => {
-  //   if (!fontsLoaded) return;
-
-  //   const inPrivateGroup = segments[0] === 'private';
-  //   const inAuthGroup = segments[0] === '(auth)';
-
-  //   if (isLoggedIn && !inPrivateGroup) {
-  //     // User is logged in but not in private area → redirect to private
-  //     router.replace('/private/(tabs)');
-  //   } else if (!isLoggedIn && !inAuthGroup) {
-  //     // User is not logged in and not on onboarding/auth → redirect to onboarding
-  //     router.replace('/');
-  //   }
-  // }, [isLoggedIn, segments, fontsLoaded]);
 
   // Show splash screen while fonts load
   if (!fontsLoaded) {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     SafeAreaView,
     View,
@@ -9,12 +9,20 @@ import {
     Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useAuthStore } from '~/lib/store/auth.store';
 
 type UserRole = 'teacher' | 'student' | null;
 
 export const RoleSelectionScreen = () => {
     const router = useRouter();
+    const session = useAuthStore((state) => state.session);
     const [selectedRole, setSelectedRole] = useState<UserRole>(null);
+
+    useEffect(() => {
+        if (!session?.access_token) {
+            router.replace('/(auth)');
+        }
+    }, [session]);
 
     const handleRoleSelection = (role: UserRole) => {
         setSelectedRole(role);

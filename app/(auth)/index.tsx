@@ -221,7 +221,7 @@ export const LoginScreen = () => {
             <Text className="text-gray-600 text-sm" style={{ fontFamily: 'Poppins_400Regular' }}>
               New to EduSync?{' '}
             </Text>
-            <TouchableOpacity onPress={() => router.push('/register')}>
+            <TouchableOpacity onPress={() => Alert.alert('Create Account', 'Just enter your email above and tap "Send OTP" — we\'ll create your account automatically!')}>
               <Text className="text-[#1E90FF] text-sm font-semibold" style={{ fontFamily: 'Poppins_600SemiBold' }}>
                 Register now
               </Text>

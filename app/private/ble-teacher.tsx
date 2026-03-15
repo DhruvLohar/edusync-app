@@ -17,8 +17,6 @@ import ExpoBleCore, {
 import { onAlertProgress, onBluetoothStateChanged, onStudentDiscovered } from "~/modules/expo-ble-core/src/ExpoBleCoreModule";
 
 import type { EventSubscription } from 'expo-modules-core';
-// REMOVE THIS IMPORT
-// import { generateShortClassId } from "~/lib/bleHash"; 
 
 interface Student {
     name: string; // Now stores the combined ID like "BEA848"
@@ -252,9 +250,7 @@ function BleTeacherView() {
     }, [students, addDebugLog]);
 
     const getAttendanceReport = useCallback(() => {
-        const report = ExpoBleCore.getDiscoveredStudents(); // FIXED: Function name
-        // const present = report.filter(s => s.status === 'present').length;
-        // Simple logic for report
+        const report = ExpoBleCore.getDiscoveredStudents();
         const total = report.length;
         const verified = report.filter(s => s.verified).length;
 
@@ -288,10 +284,6 @@ function BleTeacherView() {
                         <Text className="text-sm text-gray-500 mt-0.5">Class: {currentClassPrefix}xxx</Text>
                     </View>
                     <View className="flex-row items-center gap-2">
-                        {/* NOTE: For testing, you usually cannot scan and advertise on the 
-                          SAME device at the same time efficiently. 
-                          You need two phones to test this properly. 
-                        */}
                         <Pressable
                             onPress={() => router.push("/private/ble-student")}
                             className="bg-teal-100 px-3 py-2 rounded-lg"
