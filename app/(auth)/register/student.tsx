@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
 import {
   View,
   Text,
@@ -32,19 +32,31 @@ const YEAR_OPTIONS = Object.entries(YEARS).map(([key, value]) => ({
   label: value,
 }));
 
-// --- COMPONENTS ---
+// --- MEMOIZED COMPONENTS ---
 interface StepIndicatorProps {
   step: number;
   title: string;
   isActive: boolean;
 }
 
+const StepIndicator = memo(({ step, title, isActive }: StepIndicatorProps) => (
+  <View className="flex-row items-center">
+    <View className={`w-6 h-6 rounded-full justify-center items-center mr-2 border ${isActive ? 'bg-[#1E90FF] border-[#1E90FF]' : 'bg-white border-gray-400'}`}>
+      <Text className="text-white text-xs font-bold text-center leading-6">{isActive ? '✓' : ''}</Text>
+    </View>
+    <Text className={`text-sm font-medium ${isActive ? 'text-[#1E90FF]' : 'text-gray-400'}`} style={{ fontFamily: 'Poppins_500Medium' }}>
+      {title}
+    </Text>
+    {step < 3 && <View className="w-4 h-px bg-gray-300 mx-2.5" />}
+  </View>
+));
+
 interface SuccessModalProps {
   isVisible: boolean;
   onBackToHome: () => void;
 }
 
-const SuccessRegistrationModal: React.FC<SuccessModalProps> = ({ isVisible, onBackToHome }) => (
+const SuccessRegistrationModal = memo(({ isVisible, onBackToHome }: SuccessModalProps) => (
   <Modal animationType="fade" transparent={true} visible={isVisible} onRequestClose={onBackToHome}>
     <View className="flex-1 justify-center items-center bg-black/50">
       <View className="w-4/5 bg-white rounded-3xl p-8 items-center shadow-2xl">
@@ -62,15 +74,17 @@ const SuccessRegistrationModal: React.FC<SuccessModalProps> = ({ isVisible, onBa
       </View>
     </View>
   </Modal>
-);
+));
 
-export default function StudentRegistrationScreen() {
+// --- MAIN SCREEN ---
+const StudentRegistrationScreen = () => {
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
+  const authStore = useAuthStore();
+
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const authStore = useAuthStore();
 
   // Personal Info
   const [fullName, setFullName] = useState('');
@@ -94,64 +108,13 @@ export default function StudentRegistrationScreen() {
     if (currentStep === 3 && !hasPermission) {
       requestPermission();
     }
-  }, [currentStep, hasPermission]);
+  }, [currentStep, hasPermission, requestPermission]);
 
-  // Logic to scroll to position when focusing inputs
-  const scrollToInput = (y: number) => {
+  const scrollToInput = useCallback((y: number) => {
     scrollRef.current?.scrollTo({ y, animated: true });
-  };
+  }, []);
 
-  const handleNext = () => {
-    if (currentStep === 1) {
-      if (!fullName.trim() || !phoneNumber.trim()) {
-        Alert.alert('Error', 'Please fill in all personal information fields');
-        return;
-      }
-    }
-    if (currentStep === 2) {
-      if (!grNumber.trim() || !selectedDepartment || !selectedAcademicYear || !division) {
-        Alert.alert('Error', 'Please complete all academic details');
-        return;
-      }
-    }
-
-    if (currentStep < 3) {
-      setCurrentStep(currentStep + 1);
-      scrollRef.current?.scrollTo({ y: 0, animated: true });
-    } else {
-      handleFinalRegister();
-    }
-  };
-
-  const handleBack = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-      scrollRef.current?.scrollTo({ y: 0, animated: true });
-    } else {
-      router.back();
-    }
-  };
-
-  const captureAndProcess = async () => {
-    if (!camera.current) return;
-    try {
-      setIsProcessing(true);
-      const photo = await camera.current.takePhoto({ flash: 'off', enableShutterSound: false });
-      const photoUri = `file://${photo.path}`;
-      setCapturedImageUri(photoUri);
-      const { embedding } = await getFaceEmbedding(photoUri);
-      const userId = `${fullName.trim()} - ${grNumber.trim()}`;
-      await saveEmbedding(userId, embedding);
-      setEmbeddingSaved(true);
-      Alert.alert('Success', 'Face registered successfully!');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to capture face.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleFinalRegister = async () => {
+  const handleFinalRegister = useCallback(async () => {
     if (!embeddingSaved) return;
     setLoading(true);
     try {
@@ -168,7 +131,7 @@ export default function StudentRegistrationScreen() {
       }
 
       const response = await postToAPI<RegistrationResponse>('/users/onboard', formData, true);
-      if (response && response.success) {
+      if (response?.success) {
         await authStore.refreshUser();
         setShowSuccessModal(true);
       } else {
@@ -179,57 +142,85 @@ export default function StudentRegistrationScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [embeddingSaved, fullName, phoneNumber, division, selectedDepartment, selectedAcademicYear, grNumber, capturedImageUri, authStore]);
 
-  const handleBackToHome = () => {
+  const handleNext = useCallback(() => {
+    if (currentStep === 1) {
+      if (!fullName.trim() || !phoneNumber.trim()) {
+        Alert.alert('Error', 'Please fill in all personal information fields');
+        return;
+      }
+    }
+    if (currentStep === 2) {
+      if (!grNumber.trim() || !selectedDepartment || !selectedAcademicYear || !division) {
+        Alert.alert('Error', 'Please complete all academic details');
+        return;
+      }
+    }
+
+    if (currentStep < 3) {
+      setCurrentStep((prev) => prev + 1);
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+    } else {
+      handleFinalRegister();
+    }
+  }, [currentStep, fullName, phoneNumber, grNumber, selectedDepartment, selectedAcademicYear, division, handleFinalRegister]);
+
+  const handleBack = useCallback(() => {
+    if (currentStep > 1) {
+      setCurrentStep((prev) => prev - 1);
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+    } else {
+      router.back();
+    }
+  }, [currentStep, router]);
+
+  const captureAndProcess = useCallback(async () => {
+    if (!camera.current) return;
+    try {
+      setIsProcessing(true);
+      const photo = await camera.current.takePhoto({ flash: 'off', enableShutterSound: false });
+      const photoUri = `file://${photo.path}`;
+      setCapturedImageUri(photoUri);
+      const { embedding } = await getFaceEmbedding(photoUri);
+      const userId = `${fullName.trim()} - ${grNumber.trim()}`;
+      await saveEmbedding(userId, embedding);
+      setEmbeddingSaved(true);
+      Alert.alert('Success', 'Face registered successfully!');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to capture face.');
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [fullName, grNumber]);
+
+  const handleBackToHome = useCallback(() => {
     setShowSuccessModal(false);
     router.replace('/private/(student)/(tabs)');
-  };
-
-  const StepIndicator: React.FC<StepIndicatorProps> = ({ step, title, isActive }) => (
-    <View className="flex-row items-center">
-      <View className={`w-6 h-6 rounded-full justify-center items-center mr-2 border ${isActive ? 'bg-[#1E90FF] border-[#1E90FF]' : 'bg-white border-gray-400'}`}>
-        <Text className="text-white text-xs font-bold text-center leading-6">{isActive ? '✓' : ''}</Text>
-      </View>
-      <Text className={`text-sm font-medium ${isActive ? 'text-[#1E90FF]' : 'text-gray-400'}`} style={{ fontFamily: 'Poppins_500Medium' }}>
-        {title}
-      </Text>
-      {step < 3 && <View className="w-4 h-px bg-gray-300 mx-2.5" />}
-    </View>
-  );
+  }, [router]);
 
   return (
     <SafeAreaView className="flex-1 bg-white">
       <StatusBar barStyle="dark-content" />
-
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 24, paddingTop: 20, paddingBottom: 40 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Header */}
-          <View className="mb-8 ">
-            {/* <TouchableOpacity onPress={handleBack} className="self-start pr-4 py-1 mb-2.5">
-              <Image source={require('../../../assets/arrow.png')} className="w-10 h-10 mb-5" resizeMode="contain" />
-            </TouchableOpacity> */}
+          <View className="mb-8">
             <Text className="text-3xl font-bold text-black mt-8" style={{ fontFamily: 'Poppins_600SemiBold' }}>
               Student's Onboarding
             </Text>
           </View>
 
-          {/* Stepper */}
           <View className="flex-row items-center justify-start mb-12 mt-5">
             <StepIndicator step={1} title="Personal Info." isActive={currentStep >= 1} />
             <StepIndicator step={2} title="Academic Info" isActive={currentStep >= 2} />
             <StepIndicator step={3} title="Face ID" isActive={currentStep === 3} />
           </View>
 
-          {/* Step Contents */}
           <View className="flex-1">
             {currentStep === 1 && (
               <>
@@ -258,13 +249,14 @@ export default function StudentRegistrationScreen() {
                 </View>
                 <View className="gap-5 mb-12">
                   <View>
-                  <Text className="text-base text-black font-medium -mb-3" style={{ fontFamily: 'Poppins_500Medium' }}>Roll no.</Text>
-                  <InputField placeholder="Enter Roll Number" value={grNumber} onChangeText={setGrNumber} onFocus={() => scrollToInput(150)} />
-</View>
-<View>
-                  <Text className="text-base text-black font-medium -mb-3" style={{ fontFamily: 'Poppins_500Medium' }}>Division</Text>
-                  <InputField placeholder="Enter Division" value={division} onChangeText={setDivision} onFocus={() => scrollToInput(150)} />
-</View>
+                    <Text className="text-base text-black font-medium -mb-3" style={{ fontFamily: 'Poppins_500Medium' }}>Roll no.</Text>
+                    <InputField placeholder="Enter Roll Number" value={grNumber} onChangeText={setGrNumber} onFocus={() => scrollToInput(150)} />
+                  </View>
+                  <View>
+                    <Text className="text-base text-black font-medium -mb-3" style={{ fontFamily: 'Poppins_500Medium' }}>Division</Text>
+                    <InputField placeholder="Enter Division" value={division} onChangeText={setDivision} onFocus={() => scrollToInput(150)} />
+                  </View>
+                  
                   <Text className="text-base text-black font-medium" style={{ fontFamily: 'Poppins_500Medium' }}>Department</Text>
                   <View className="flex-row flex-wrap gap-2.5">
                     {DEPARTMENT_OPTIONS.map((dept) => (
@@ -311,7 +303,13 @@ export default function StudentRegistrationScreen() {
                   disabled={embeddingSaved}
                   className={`h-16 w-full rounded-xl ${embeddingSaved ? 'bg-green-500' : 'bg-[#1E90FF]'}`} 
                 />
-                <Button title="Complete Registration" loading={loading} onPress={handleNext} disabled={!embeddingSaved} className="h-14 w-full rounded-xl mt-5 bg-[#1E90FF]" />
+                <Button 
+                  title="Complete Registration" 
+                  loading={loading} 
+                  onPress={handleNext} 
+                  disabled={!embeddingSaved} 
+                  className="h-14 w-full rounded-xl mt-5 bg-[#1E90FF]" 
+                />
               </View>
             )}
           </View>
@@ -321,4 +319,6 @@ export default function StudentRegistrationScreen() {
       <SuccessRegistrationModal isVisible={showSuccessModal} onBackToHome={handleBackToHome} />
     </SafeAreaView>
   );
-}
+};
+
+export default React.memo(StudentRegistrationScreen);

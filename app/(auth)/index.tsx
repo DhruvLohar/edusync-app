@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, memo } from 'react';
 import {
   SafeAreaView,
   View,
@@ -33,8 +33,8 @@ interface OTPFormProps {
   loading: boolean;
 }
 
-// --- CENTERED MODAL COMPONENT ---
-const CenteredModal = ({ isVisible, onClose, children }: ModalProps) => {
+// --- CENTERED MODAL COMPONENT (Memoized) ---
+const CenteredModal = memo(({ isVisible, onClose, children }: ModalProps) => {
   return (
     <Modal 
       visible={isVisible} 
@@ -46,7 +46,6 @@ const CenteredModal = ({ isVisible, onClose, children }: ModalProps) => {
         <View className="flex-1 bg-black/60 justify-center items-center px-6">
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
-            // keyboardVerticalOffset helps push the modal higher up
             keyboardVerticalOffset={Platform.OS === "ios" ? 0 : -40}
             className="w-full items-center"
           >
@@ -66,15 +65,16 @@ const CenteredModal = ({ isVisible, onClose, children }: ModalProps) => {
       </TouchableWithoutFeedback>
     </Modal>
   );
-};
+});
 
-// --- OTP FORM COMPONENT ---
-const OTPForm = ({ onSubmit, loading }: OTPFormProps) => {
+// --- OTP FORM COMPONENT (Memoized) ---
+const OTPForm = memo(({ onSubmit, loading }: OTPFormProps) => {
   const [otp, setOtp] = useState('');
+
+  const handleOtpChange = (text: string) => setOtp(text);
 
   return (
     <View>
-
       <Text className="text-2xl text-black mb-2" style={{ fontFamily: 'Poppins_600SemiBold' }}>
         Check Your Email
       </Text>
@@ -88,13 +88,11 @@ const OTPForm = ({ onSubmit, loading }: OTPFormProps) => {
           placeholder="000000"
           keyboardType="number-pad"
           value={otp}
-          onChangeText={setOtp}
+          onChangeText={handleOtpChange}
           maxLength={6}
-          // Changed text-center to text-left
-          // Added pl-10 (padding left) to align the start of the text
           className="h-16 border border-gray-100 bg-gray-50 rounded-2xl text-left px-9 text-3xl tracking-[39px] text-[#1E90FF]"
           style={{ fontFamily: 'Poppins_600SemiBold' }}
-          autoFocus={true} // Automatically open keyboard
+          autoFocus={true}
         />
       </View>
 
@@ -112,7 +110,7 @@ const OTPForm = ({ onSubmit, loading }: OTPFormProps) => {
       </TouchableOpacity>
     </View>
   );
-};
+});
 
 // --- LOGIN SCHEMA ---
 const loginSchema = z.object({
@@ -122,7 +120,7 @@ const loginSchema = z.object({
 type LoginFormData = z.infer<typeof loginSchema>;
 
 // --- MAIN LOGIN SCREEN ---
-export const LoginScreen = () => {
+const LoginScreen = () => {
   const router = useRouter();
   const authStore = useAuthStore();
 
@@ -140,11 +138,12 @@ export const LoginScreen = () => {
     defaultValues: { email: '' },
   });
 
-  const onSubmitStatic = async (data: LoginFormData) => {
+  // Memoized submission handler
+  const onSubmitStatic = useCallback(async (data: LoginFormData) => {
     setLoading(true);
     try {
       const response = await authStore.login({ email: data.email });
-      if (response && response.success) {
+      if (response?.success) {
         setLoginEmail(data.email);
         setModalVisible(true);
       } else {
@@ -155,13 +154,14 @@ export const LoginScreen = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [authStore]);
 
-  const handleVerifyOTP = async ({ otp }: { otp: string }) => {
+  // Memoized OTP verification
+  const handleVerifyOTP = useCallback(async ({ otp }: { otp: string }) => {
     setLoading(true);
     try {
       const response = await authStore.verifyOTP(loginEmail, otp);
-      if (response && response.success) {
+      if (response?.success) {
         setModalVisible(false);
         if(!response.data.onboarding_done){
           router.push('/register/student');
@@ -178,7 +178,9 @@ export const LoginScreen = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [authStore, loginEmail, router]);
+
+  const closeModal = useCallback(() => setModalVisible(false), []);
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -241,11 +243,11 @@ export const LoginScreen = () => {
         </View>
       </ScrollView>
 
-      <CenteredModal isVisible={isModalVisible} onClose={() => setModalVisible(false)}>
+      <CenteredModal isVisible={isModalVisible} onClose={closeModal}>
         <OTPForm onSubmit={handleVerifyOTP} loading={loading} />
       </CenteredModal>
     </SafeAreaView>
   );
 };
 
-export default LoginScreen;
+export default React.memo(LoginScreen);
