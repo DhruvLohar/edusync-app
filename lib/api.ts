@@ -1,7 +1,7 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-export const API_URL = 'http://192.168.1.15:3000';
+export const API_URL = 'https://edusync-backend-ten.vercel.app';
 
 axios.defaults.baseURL = API_URL;
 

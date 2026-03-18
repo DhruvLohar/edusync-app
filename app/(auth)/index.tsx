@@ -9,6 +9,9 @@ import {
   ScrollView,
   Image,
   Modal,
+  TouchableWithoutFeedback,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -19,7 +22,7 @@ import { Button } from '~/components/ui/Button';
 import type { PropsWithChildren } from 'react';
 import { useAuthStore } from '~/lib/store/auth.store';
 
-// --- TYPE DEFINITIONS FOR MODAL COMPONENTS ---
+// --- TYPE DEFINITIONS ---
 interface ModalProps extends PropsWithChildren {
   isVisible: boolean;
   onClose: () => void;
@@ -30,61 +33,95 @@ interface OTPFormProps {
   loading: boolean;
 }
 
-// --- MODAL AND OTP COMPONENT PLACEHOLDERS ---
-
-// Simplified BottomModal component, using RN Modal for reliable overlay
-const BottomModal = ({ isVisible, onClose, children }: ModalProps) => {
+// --- CENTERED MODAL COMPONENT ---
+const CenteredModal = ({ isVisible, onClose, children }: ModalProps) => {
   return (
-    <Modal visible={isVisible} animationType="slide" transparent={true} onRequestClose={onClose}>
-      <View className="absolute inset-0 bg-black/50 justify-end items-center">
-        <View className="w-full bg-white rounded-t-3xl pt-2.5 min-h-[300px]">
-          <TouchableOpacity onPress={onClose} className="self-end px-5 pb-2.5">
-            <Text className="text-2xl font-bold">×</Text>
-          </TouchableOpacity>
-          {children}
+    <Modal 
+      visible={isVisible} 
+      animationType="fade" 
+      transparent={true} 
+      onRequestClose={onClose}
+    >
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View className="flex-1 bg-black/60 justify-center items-center px-6">
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            // keyboardVerticalOffset helps push the modal higher up
+            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : -40}
+            className="w-full items-center"
+          >
+            <TouchableWithoutFeedback>
+              <View className="w-full bg-white rounded-[25px] p-8 shadow-2xl relative">
+                <TouchableOpacity 
+                  onPress={onClose} 
+                  className="absolute right-6 top-6 z-10 w-8 h-8 items-center justify-center bg-gray-100 rounded-full"
+                >
+                  <Text className="text-gray-500 text-xl font-bold">×</Text>
+                </TouchableOpacity>
+                {children}
+              </View>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
         </View>
-      </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 };
 
-// Simplified OTPForm component
+// --- OTP FORM COMPONENT ---
 const OTPForm = ({ onSubmit, loading }: OTPFormProps) => {
   const [otp, setOtp] = useState('');
+
   return (
-    <View className="p-5">
-      <Text className="text-2xl font-bold text-center mb-2" style={{ fontFamily: 'Poppins_600SemiBold' }}>
-        Enter OTP
+    <View>
+
+      <Text className="text-2xl text-black mb-2" style={{ fontFamily: 'Poppins_600SemiBold' }}>
+        Check Your Email
       </Text>
-      <Text className="text-sm text-gray-500 text-center mb-8" style={{ fontFamily: 'Poppins_400Regular' }}>
-        A 6-digit code has been sent to your email.
+      
+      <Text className="text-sm text-gray-500 mt-2 px-2" style={{ fontFamily: 'Poppins_400Regular' }}>
+        We've sent a 6-digit verification code to your inbox.
       </Text>
+
+      <View className="w-full">
         <InputField
-        label='OTP'
-        placeholder="0 0 0 0 0 0"
-        keyboardType="number-pad"
-        value={otp}
-        onChangeText={setOtp}
-        maxLength={6}
-        className="h-16 border border-gray-300 rounded-lg mx-5 mb-5 text-center text-2xl tracking-[10px]"
-      />
+          placeholder="000000"
+          keyboardType="number-pad"
+          value={otp}
+          onChangeText={setOtp}
+          maxLength={6}
+          // Changed text-center to text-left
+          // Added pl-10 (padding left) to align the start of the text
+          className="h-16 border border-gray-100 bg-gray-50 rounded-2xl text-left px-9 text-3xl tracking-[39px] text-[#1E90FF]"
+          style={{ fontFamily: 'Poppins_600SemiBold' }}
+          autoFocus={true} // Automatically open keyboard
+        />
+      </View>
+
       <Button
-        title="Verify OTP"
+        title="Verify Code"
         loading={loading}
         onPress={() => onSubmit({ otp })}
-        className="h-12 bg-[#1E90FF] rounded-lg mx-5 mt-2.5"
+        className="w-full h-14 bg-[#1E90FF] rounded-xl mt-6 shadow-lg shadow-blue-300"
       />
+      
+      <TouchableOpacity className="mt-6">
+        <Text className="text-gray-400 font-medium text-center" style={{ fontFamily: 'Poppins_400Regular' }}>
+          Didn't get it? <Text className="text-[#1E90FF] font-bold">Resend OTP</Text>
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 };
-// ----------------------------------------------
 
+// --- LOGIN SCHEMA ---
 const loginSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email address' }),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
+// --- MAIN LOGIN SCREEN ---
 export const LoginScreen = () => {
   const router = useRouter();
   const authStore = useAuthStore();
@@ -107,9 +144,8 @@ export const LoginScreen = () => {
     setLoading(true);
     try {
       const response = await authStore.login({ email: data.email });
-      console.log('Login Response:', response);
       if (response && response.success) {
-        setLoginEmail(data.email); // Save email for OTP verification
+        setLoginEmail(data.email);
         setModalVisible(true);
       } else {
         Alert.alert('Login Failed', response?.message || 'Unable to send OTP.');
@@ -125,17 +161,14 @@ export const LoginScreen = () => {
     setLoading(true);
     try {
       const response = await authStore.verifyOTP(loginEmail, otp);
-      console.log('OTP Verification Response:', response);
       if (response && response.success) {
         setModalVisible(false);
-        Alert.alert('Success! 🎉', 'OTP verified.');
-        console.log('onboarding_done:', response.data.onboarding_done);
-        console.log('user_type:', response.data.user_type);
         if(!response.data.onboarding_done){
-          router.push('/register');
+          router.push('/register/student');
         } else {
-          console.log('Navigating to:', response.data.user_type === 'teacher' ? '/private/(teacher)/(tabs)' : '/private/(student)/(tabs)');
-          response.data.user_type === 'teacher' ? router.replace('/private/(teacher)/(tabs)') : router.replace('/private/(student)/(tabs)');
+          response.data.user_type === 'teacher' 
+            ? router.replace('/private/(teacher)/(tabs)') 
+            : router.replace('/private/(student)/(tabs)');
         }
       } else {
         Alert.alert('Verification Failed', response?.message || 'Invalid OTP.');
@@ -152,40 +185,34 @@ export const LoginScreen = () => {
       <StatusBar barStyle="dark-content" />
 
       <ScrollView
-        contentContainerStyle={{ 
-          flexGrow: 1, 
-          paddingHorizontal: 24, 
-          paddingTop: 0, 
-          paddingBottom: 20, 
-          justifyContent: 'center' 
-        }}
+        contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 24, justifyContent: 'center' }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <View className="flex-0 self-stretch">
+        <View className="self-stretch">
           <Image 
             source={require('../../assets/logo.png')} 
-            className="w-20 h-20 mb-5 -mt-10"
+            className="w-20 h-20 mb-7 -mt-20"
             resizeMode="contain"
           />
 
-          <Text className="text-4xl text-black mb-0 font-normal" style={{ fontFamily: 'Poppins_600SemiBold' }}>
+          <Text className="text-4xl text-black" style={{ fontFamily: 'Poppins_600SemiBold' }}>
             Welcome Back
           </Text>
-          <Text className="text-4xl text-black mb-2.5 font-bold" style={{ fontFamily: 'Poppins_600SemiBold' }}>
-            To <Text className="text-[#1E90FF]" style={{ fontFamily: 'Poppins_600SemiBold' }}>EduSync</Text>
+          <Text className="text-4xl text-black mb-5" style={{ fontFamily: 'Poppins_600SemiBold' }}>
+            To <Text className="text-[#1E90FF]">EduSync</Text>
           </Text>
           <Text className="text-base text-gray-500" style={{ fontFamily: 'Poppins_400Regular' }}>
             Hello there, Login to continue
           </Text>
 
-          <View className="mb-4 relative mt-8">
+          <View className="mb-4 relative mt-10">
             <Controller
               control={control}
               name="email"
               render={({ field: { onChange, onBlur, value } }) => (
                 <InputField
-                label='Email Address'
+                  label='Email Address'
                   placeholder="Enter Email Address"
                   onBlur={() => {
                     onBlur();
@@ -197,42 +224,26 @@ export const LoginScreen = () => {
                   keyboardType="email-address"
                   onFocus={() => setIsEmailFocused(true)}
                   className={`border ${
-                    isEmailFocused ? 'border-[#1E90FF]' : 'border-gray-300'
-                  } rounded-lg px-4 bg-white h-12`}
-                  style={{ paddingHorizontal: 15, fontSize: 12, color: '#333' }}
+                    isEmailFocused ? 'border-[#1E90FF]' : 'border-gray-200'
+                  } rounded-xl px-4 bg-white h-14`}
+                  style={{ fontSize: 14 }}
                 />
               )}
             />
-            <TouchableOpacity className="absolute right-0 -bottom-6 py-1">
-              <Text className="text-[#1E90FF] text-sm font-semibold" style={{ fontFamily: 'Poppins_600SemiBold' }}>
-                Need Help?
-              </Text>
-            </TouchableOpacity>
           </View>
 
           <Button
             title="Send OTP"
             loading={loading}
             onPress={handleSubmit(onSubmitStatic)}
-            className="mt-9 h-12 py-2 bg-[#1E90FF] rounded-lg"
+            className="h-14 bg-[#1E90FF] rounded-xl shadow-md shadow-blue-400"
           />
-
-          <View className="flex-row justify-center items-center mt-5">
-            <Text className="text-gray-600 text-sm" style={{ fontFamily: 'Poppins_400Regular' }}>
-              New to EduSync?{' '}
-            </Text>
-            <TouchableOpacity onPress={() => Alert.alert('Create Account', 'Just enter your email above and tap "Send OTP" — we\'ll create your account automatically!')}>
-              <Text className="text-[#1E90FF] text-sm font-semibold" style={{ fontFamily: 'Poppins_600SemiBold' }}>
-                Register now
-              </Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </ScrollView>
 
-      <BottomModal isVisible={isModalVisible} onClose={() => setModalVisible(false)}>
+      <CenteredModal isVisible={isModalVisible} onClose={() => setModalVisible(false)}>
         <OTPForm onSubmit={handleVerifyOTP} loading={loading} />
-      </BottomModal>
+      </CenteredModal>
     </SafeAreaView>
   );
 };
