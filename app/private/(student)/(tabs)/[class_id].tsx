@@ -11,6 +11,7 @@ import {
   Alert,
   Animated,
   Easing,
+  BackHandler,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -33,6 +34,7 @@ import { Attendance } from '~/type/Teacher';
 import { useAuthStore } from '~/lib/store/auth.store';
 import { useStudentAttendance } from '~/lib/hook/useStudentAttendance';
 import { useAudio } from '~/lib/hook/useAudio';
+import ExitConfirmSheet from '~/components/ExitConfirmSheet';
 
 const SIMILARITY_THRESHOLD = 0.6;
 
@@ -44,6 +46,8 @@ const StudentHomeScreen: React.FC = () => {
   const { class_id, live_id } = useLocalSearchParams<{ class_id: string, live_id: string }>();
 
   // --- STATE ---
+  const [showExitSheet, setShowExitSheet] = useState(false);
+  const allowExitRef = useRef(false);
   const [attendanceDetails, setAttendanceDetails] = useState<Attendance | null>(null);
   const [scanPhase, setScanPhase] = useState<ScanPhase>('idle');
   const [registeredUser, setRegisteredUser] = useState<string | null>(null);
@@ -89,6 +93,24 @@ const StudentHomeScreen: React.FC = () => {
     onCheckInSuccess,
     onCheckOutSuccess,
   });
+
+  // Intercept hardware back button
+  useEffect(() => {
+    const onBackPress = () => {
+      if (allowExitRef.current) return false;
+      setShowExitSheet(true);
+      return true;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, []);
+
+  const confirmExit = () => {
+    setShowExitSheet(false);
+    if (checkedIn) handleCheckOut();
+    allowExitRef.current = true;
+    router.back();
+  };
 
   async function fetchLiveAttendanceDetails() {
     const res = await fetchFromAPI('teachers/attendance/' + class_id);
@@ -246,7 +268,7 @@ const StudentHomeScreen: React.FC = () => {
 
       {/* HEADER */}
       <View className="px-5 mt-4 flex-row justify-between items-center z-10">
-        <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2 rounded-full bg-white/50">
+        <TouchableOpacity onPress={() => setShowExitSheet(true)} className="p-2 -ml-2 rounded-full bg-white/50">
           <Ionicons name="chevron-back" size={28} color="black" />
         </TouchableOpacity>
         <Text className="text-lg font-medium text-gray-700">Live Attendance</Text>
@@ -354,6 +376,15 @@ const StudentHomeScreen: React.FC = () => {
         </View>
 
       </View>
+
+      <ExitConfirmSheet
+        visible={showExitSheet}
+        onCancel={() => setShowExitSheet(false)}
+        onConfirm={confirmExit}
+        title="Leave Attendance?"
+        message="Are you sure your attendance has been marked? If you leave now and it hasn't been confirmed by your teacher, you may be marked absent."
+        confirmText="Yes, I'm Done"
+      />
 
       {/* --- CAMERA MODAL --- */}
       <Modal

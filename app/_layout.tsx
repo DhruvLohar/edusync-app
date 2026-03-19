@@ -20,7 +20,7 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  const { profile, session, rehydrateSession } = useAuthStore();
+  const { profile, session, isSessionInitialized, rehydrateSession } = useAuthStore();
 
   const [fontsLoaded] = useFonts({
     Poppins_300Light,
@@ -42,8 +42,8 @@ export default function RootLayout() {
     }
   }, [fontsLoaded]);
 
-  // Show splash screen while fonts load
-  if (!fontsLoaded) {
+  // Show splash screen while fonts load or session is being rehydrated
+  if (!fontsLoaded || !isSessionInitialized) {
     return <CustomSplashScreen message="Loading..." />;
   }
 

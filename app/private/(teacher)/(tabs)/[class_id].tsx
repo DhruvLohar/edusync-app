@@ -6,15 +6,17 @@ import {
     ScrollView,
     Alert,
     Image,
+    BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { fetchFromAPI } from '~/lib/api';
+import { fetchFromAPI, postToAPI } from '~/lib/api';
 import { Attendance } from '~/type/Teacher';
 import { useTeacherAttendance } from '~/lib/hook/useTeacherAttendance';
 import type { Student as BLEStudent } from '~/lib/hook/useTeacherAttendance';
 import { renderAPIImage } from '~/lib/ImageChecker';
+import ExitConfirmSheet from '~/components/ExitConfirmSheet';
 
 interface EnrichedStudent {
     roll_no: string;
@@ -34,6 +36,8 @@ const TeacherAttendanceScreen: React.FC = () => {
     const [attendanceDetails, setAttendanceDetails] = useState<Attendance | null>(null);
     const [students, setStudents] = useState<EnrichedStudent[]>([]);
     const [attendance, setAttendance] = useState<Record<string, 'present' | 'absent'>>({});
+    const [showExitSheet, setShowExitSheet] = useState(false);
+    const allowExitRef = React.useRef(false);
 
     // BLE Hook
     const {
@@ -77,6 +81,33 @@ const TeacherAttendanceScreen: React.FC = () => {
             );
         }, []),
     });
+
+    // Intercept hardware back button
+    useEffect(() => {
+        const onBackPress = () => {
+            if (allowExitRef.current) return false;
+            setShowExitSheet(true);
+            return true;
+        };
+        const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+        return () => sub.remove();
+    }, []);
+
+    const confirmExit = async () => {
+        setShowExitSheet(false);
+        if (scanning) stopScanning();
+
+        // End the attendance session as abnormal (exited without submitting)
+        if (class_id) {
+            await postToAPI('teachers/end-attendance', {
+                attendance_id: Number(class_id),
+                ended_abnormally: true,
+            });
+        }
+
+        allowExitRef.current = true;
+        router.back();
+    };
 
     async function fetchLiveAttendanceDetails() {
         const res = await fetchFromAPI('teachers/attendance/' + class_id);
@@ -191,22 +222,31 @@ const TeacherAttendanceScreen: React.FC = () => {
                     text: 'Submit',
                     onPress: async () => {
                         try {
-                            // Stop scanning if active
                             if (scanning) {
                                 stopScanning();
                             }
 
-                            const attendanceData = students.map(student => ({
+                            const records = students.map(student => ({
                                 roll_no: student.roll_no,
                                 status: attendance[student.roll_no] || 'absent',
                             }));
 
-                            Alert.alert('Success', 'Attendance submitted successfully!', [
-                                {
-                                    text: 'OK',
-                                    onPress: () => router.back(),
-                                },
-                            ]);
+                            const res = await postToAPI('teachers/submit-attendance', {
+                                attendance_id: Number(class_id),
+                                records,
+                            });
+
+                            if (res?.success) {
+                                allowExitRef.current = true;
+                                Alert.alert('Success', 'Attendance submitted successfully!', [
+                                    {
+                                        text: 'OK',
+                                        onPress: () => router.back(),
+                                    },
+                                ]);
+                            } else {
+                                Alert.alert('Error', res?.message || 'Failed to submit attendance.');
+                            }
                         } catch (error) {
                             console.error('Submit attendance error:', error);
                             Alert.alert('Error', 'Failed to submit attendance. Please try again.');
@@ -225,7 +265,7 @@ const TeacherAttendanceScreen: React.FC = () => {
         <SafeAreaView className="flex-1 bg-[#f0f8ff]">
             {/* Header */}
             <View className="px-5 py-4 flex-row justify-between items-center bg-white border-b border-gray-200">
-                <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
+                <TouchableOpacity onPress={() => setShowExitSheet(true)} className="p-2 -ml-2">
                     <Ionicons name="chevron-back" size={28} color="black" />
                 </TouchableOpacity>
                 <Text className="text-lg font-semibold text-gray-900">Live Attendance</Text>
@@ -390,6 +430,15 @@ const TeacherAttendanceScreen: React.FC = () => {
                     )}
                 </View>
             </ScrollView>
+
+            <ExitConfirmSheet
+                visible={showExitSheet}
+                onCancel={() => setShowExitSheet(false)}
+                onConfirm={confirmExit}
+                title="End Attendance Session?"
+                message="Are you sure you want to leave? If scanning is active it will be stopped. Make sure you have submitted attendance before exiting."
+                confirmText="Yes, Exit Session"
+            />
         </SafeAreaView>
     );
 };

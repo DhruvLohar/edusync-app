@@ -141,10 +141,11 @@ const LoginScreen = () => {
   // Memoized submission handler
   const onSubmitStatic = useCallback(async (data: LoginFormData) => {
     setLoading(true);
+    const email = data.email.toLowerCase().trim();
     try {
-      const response = await authStore.login({ email: data.email });
+      const response = await authStore.login({ email });
       if (response?.success) {
-        setLoginEmail(data.email);
+        setLoginEmail(email);
         setModalVisible(true);
       } else {
         Alert.alert('Login Failed', response?.message || 'Unable to send OTP.');

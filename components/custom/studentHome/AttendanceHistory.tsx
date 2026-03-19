@@ -1,71 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-} from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { fetchFromAPI } from '~/lib/api';
+import React, { memo, useMemo } from 'react';
+import { View, Text } from 'react-native';
 import type { AttendanceRecord } from '~/type/Student';
 
-interface TodaysLectureProps {
+interface AttendanceHistoryProps {
   history: AttendanceRecord[];
 }
 
-const TodaysLecture: React.FC<TodaysLectureProps> = ({ history }) => {
-  const [todaysSessions, setTodaysSessions] = useState<AttendanceRecord[]>([]);
-  const [currentDate, setCurrentDate] = useState<string>('');
-
-  useEffect(() => {
-    // Format today's date
-    const today = new Date();
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    const formattedDate = `${dayNames[today.getDay()]} ${today.getDate()} ${monthNames[today.getMonth()]} ${today.getFullYear()}`;
-    setCurrentDate(formattedDate);
-
-    // Filter today's sessions from history
-    filterTodaysSessions();
-  }, [history]);
-
-  const filterTodaysSessions = () => {
-    if (!history || history.length === 0) {
-      setTodaysSessions([]);
-      return;
-    }
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const filtered = history.filter((record) => {
-      const recordDate = new Date(record.session.start_time);
-      recordDate.setHours(0, 0, 0, 0);
-      return recordDate.getTime() === today.getTime();
-    });
-
-    setTodaysSessions(filtered);
-  };
+const AttendanceHistory: React.FC<AttendanceHistoryProps> = ({ history }) => {
+  const historyRecords = useMemo(
+    () =>
+      [...history].sort(
+        (a, b) =>
+          new Date(b.session.start_time).getTime() - new Date(a.session.start_time).getTime()
+      ),
+    [history]
+  );
 
   const formatTime = (dateValue: string | Date) => {
     const date = new Date(dateValue);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  const getSessionStatus = (session: AttendanceRecord) => {
-    if (session.is_present && session.marked_at) {
-      return {
-        status: 'Actual Check-in',
-        icon: 'check-circle',
-        color: '#10b981',
-        time: formatTime(session.marked_at),
-      };
-    }
-    return null;
-  };
-
-  const getBreakStatus = (session: AttendanceRecord) => {
-    // No break status in AttendanceRecord, return null
-    return null;
   };
 
   const formatDate = (dateValue: string | Date) => {
@@ -86,20 +39,22 @@ const TodaysLecture: React.FC<TodaysLectureProps> = ({ history }) => {
         Attendance History
       </Text>
 
-      {/* Sessions Column */}
       <View className="gap-4">
-        {todaysSessions.length > 0 ? (
-          todaysSessions.map((record, index) => {
+        {historyRecords.length > 0 ? (
+          historyRecords.map((record) => {
+            const attendanceStatus = record.is_present ? 'Present' : 'Absent';
+            const statusBadgeClass = record.is_present ? 'bg-[#EAFBF2]' : 'bg-[#FFF1F2]';
+            const statusTextClass = record.is_present ? 'text-[#1F9D62]' : 'text-[#DC5C75]';
+
             return (
               <View
-                key={index}
+                key={record.id}
                 className="w-full bg-white rounded-2xl p-6 flex-row"
-                style={{ 
-                  borderLeftWidth: 5, 
-                  borderLeftColor: '#3b82f6',
+                style={{
+                  borderLeftWidth: 5,
+                  borderLeftColor: record.is_present ? '#1F9D62' : '#DC5C75',
                 }}
               >
-                {/* Left Content */}
                 <View className="flex-1">
                   <Text
                     className="text-xl font-semibold text-gray-900 mb-2"
@@ -107,6 +62,11 @@ const TodaysLecture: React.FC<TodaysLectureProps> = ({ history }) => {
                   >
                     {record.class?.subject || 'Lecture'}
                   </Text>
+                  <View className={`self-start px-3 py-1 rounded-full mb-2 ${statusBadgeClass}`}>
+                    <Text className={`text-xs ${statusTextClass}`} style={{ fontFamily: 'Poppins_600SemiBold' }}>
+                      {attendanceStatus}
+                    </Text>
+                  </View>
                   <Text
                     className="text-sm text-gray-500"
                     style={{ fontFamily: 'Poppins_400Regular' }}
@@ -115,7 +75,6 @@ const TodaysLecture: React.FC<TodaysLectureProps> = ({ history }) => {
                   </Text>
                 </View>
 
-                {/* Right Content */}
                 <View className="items-end justify-center gap-3">
                   <Text
                     className="text-lg font-semibold text-gray-900"
@@ -129,6 +88,11 @@ const TodaysLecture: React.FC<TodaysLectureProps> = ({ history }) => {
                   >
                     {formatDate(record.session.start_time)}
                   </Text>
+                  {record.marked_at ? (
+                    <Text className="text-xs text-gray-500" style={{ fontFamily: 'Poppins_400Regular' }}>
+                      Marked: {formatTime(record.marked_at)}
+                    </Text>
+                  ) : null}
                 </View>
               </View>
             );
@@ -139,7 +103,7 @@ const TodaysLecture: React.FC<TodaysLectureProps> = ({ history }) => {
               className="text-gray-600 text-center"
               style={{ fontFamily: 'Poppins_400Regular' }}
             >
-              No lectures scheduled for today
+              No attendance history found yet
             </Text>
           </View>
         )}
@@ -148,4 +112,4 @@ const TodaysLecture: React.FC<TodaysLectureProps> = ({ history }) => {
   );
 };
 
-export default TodaysLecture;
+export default memo(AttendanceHistory);

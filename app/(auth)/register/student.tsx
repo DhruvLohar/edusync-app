@@ -31,6 +31,8 @@ const YEAR_OPTIONS = Object.entries(YEARS).map(([key, value]) => ({
   key: key as Year,
   label: value,
 }));
+const DIVISION_OPTIONS = ['A', 'B'] as const;
+type DivisionOption = typeof DIVISION_OPTIONS[number];
 
 // --- MEMOIZED COMPONENTS ---
 interface StepIndicatorProps {
@@ -94,7 +96,7 @@ const StudentRegistrationScreen = () => {
   const [rollNumber, setRollNumber] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState<Year | null>(null);
-  const [division, setDivision] = useState('');
+  const [division, setDivision] = useState<DivisionOption | null>(null);
 
   // Face Recognition
   const [capturedImageUri, setCapturedImageUri] = useState<string | null>(null);
@@ -121,11 +123,11 @@ const StudentRegistrationScreen = () => {
       const formData = new FormData();
       formData.append('name', fullName);
       formData.append('phone', phoneNumber);
-      formData.append('div', division);
+      formData.append('div', division || '');
       formData.append('user_type', 'student');
       formData.append('department', selectedDepartment || '');
       formData.append('year', selectedAcademicYear || '');
-      formData.append('division', division);
+      formData.append('division', division || '');
       formData.append('roll_no', rollNumber);
       if (capturedImageUri) {
         formData.append('profile_photo', { uri: capturedImageUri, name: 'profile.jpg', type: 'image/jpeg' } as any);
@@ -277,7 +279,17 @@ const StudentRegistrationScreen = () => {
 
                   <View>
                     <Text className="text-base text-black font-medium -mb-3 mt-2" style={{ fontFamily: 'Poppins_500Medium' }}>Division</Text>
-                    <InputField placeholder="Enter Division" value={division} onChangeText={setDivision} onFocus={() => scrollToInput(150)} />
+                    <View className="flex-row flex-wrap gap-2.5 mt-5">
+                      {DIVISION_OPTIONS.map((option) => (
+                        <TouchableOpacity
+                          key={option}
+                          className={`px-4 py-2.5 rounded-lg border ${division === option ? 'border-[#1E90FF] bg-[#E8F2FF]' : 'border-gray-300 bg-white'}`}
+                          onPress={() => setDivision(option)}
+                        >
+                          <Text className={`text-sm ${division === option ? 'text-[#1E90FF] font-bold' : 'text-gray-700'}`}>{option}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
                   </View>
 
                   <View>

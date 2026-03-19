@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { memo, useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,28 +9,32 @@ import { LiveAttendanceResponse } from '~/type/Teacher';
 import { fetchFromAPI } from '~/lib/api';
 import { useAuthStore } from '~/lib/store/auth.store';
 
-function LectureCards() {
+interface LectureCardsProps {
+  refreshToken?: number;
+}
+
+function LectureCards({ refreshToken = 0 }: LectureCardsProps) {
   const router = useRouter();
   const profile = useAuthStore((state) => state.profile);
   const [lecture, setLecture] = useState<LiveAttendanceResponse | null>(null);
 
-  async function fetchLectures() {
-    
+  const fetchLectures = useCallback(async () => {
     const res = await fetchFromAPI('students/live-attendance');
-    console.log(res);
-
     if (res && res.success && res.data) {
       setLecture(res.data);
     } else {
       setLecture(null);
     }
-  }
+  }, []);
 
   useEffect(() => {
     fetchLectures();
-  }, []);
+    const interval = setInterval(fetchLectures, 15000);
+    return () => clearInterval(interval);
+  }, [fetchLectures, refreshToken]);
 
-  const handleCardPress = () => {
+  const handleCardPress = useCallback(() => {
+    if (!lecture?.id) return;
     try {
       router.push({
         pathname: '/private/(student)/(tabs)/[class_id]',
@@ -39,7 +43,7 @@ function LectureCards() {
     } catch (error) {
       console.error('Navigation error:', error);
     }
-  };
+  }, [lecture?.id, lecture?.live_id, profile?.roll_no, router]);
 
   const formatTime = (dateString: Date) => {
     const date = new Date(dateString);
@@ -50,7 +54,7 @@ function LectureCards() {
     });
   };
 
-  const LectureCard = ({ lecture }: { lecture: LiveAttendanceResponse }) => {
+  const LectureCard = memo(({ lecture }: { lecture: LiveAttendanceResponse }) => {
     const isMarked = lecture.already_marked;
     
     return (
@@ -117,7 +121,7 @@ function LectureCards() {
         </View>
       </TouchableOpacity>
     );
-  };
+  });
 
   return (
     <View className="gap-4 px-4 pb-4">
@@ -151,4 +155,4 @@ function LectureCards() {
   );
 }
 
-export default React.memo(LectureCards);
+export default memo(LectureCards);

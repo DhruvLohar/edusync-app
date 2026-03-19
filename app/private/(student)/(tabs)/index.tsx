@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -27,19 +27,35 @@ const StudentHomeScreen: React.FC = () => {
   const profile = useAuthStore((state) => state.profile);
   const [history, setHistory] = useState<AttendanceRecord[]>([]);
   const [isAttendanceModalVisible, setIsAttendanceModalVisible] = useState(false);
+  const [lectureRefreshToken, setLectureRefreshToken] = useState(0);
 
+  const fetchHistory = useCallback(async () => {
+    const res = await fetchFromAPI<{ records: AttendanceRecord[] }>('/students/history');
+    if (res && res.success && res.data && Array.isArray(res.data.records)) {
+      setHistory(res.data.records);
+      return;
+    }
+    setHistory([]);
+  }, []);
 
   useEffect(() => {
-    const fetchHistory = async () => {
-      const res = await fetchFromAPI<{ records: AttendanceRecord[] }>('/students/history');
-      if (res && res.success && res.data && Array.isArray(res.data.records)) {
-        setHistory(res.data.records);
-      } else {
-        setHistory([]);
-      }
-    };
     fetchHistory();
+  }, [fetchHistory]);
+
+  useEffect(() => {
+    const interval = setInterval(fetchHistory, 30000);
+    return () => clearInterval(interval);
+  }, [fetchHistory]);
+
+  const openAttendanceModal = useCallback(() => {
+    setLectureRefreshToken((prev) => prev + 1);
+    setIsAttendanceModalVisible(true);
   }, []);
+
+  const closeAttendanceModal = useCallback(() => {
+    setIsAttendanceModalVisible(false);
+    fetchHistory();
+  }, [fetchHistory]);
 
   return (
     <SafeAreaView className="flex-1">
@@ -79,7 +95,7 @@ const StudentHomeScreen: React.FC = () => {
         </View>
         <View className="px-5 mt-6 mb-6">
           <TouchableOpacity
-            onPress={() => setIsAttendanceModalVisible(true)}
+            onPress={openAttendanceModal}
             className="w-full bg-[#0095FF] rounded-full py-4 items-center justify-center"
             activeOpacity={0.7}
           >
@@ -104,7 +120,7 @@ const StudentHomeScreen: React.FC = () => {
         visible={isAttendanceModalVisible}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={() => setIsAttendanceModalVisible(false)}
+        onRequestClose={closeAttendanceModal}
       >
         <SafeAreaView className="flex-1 bg-[#f0f8ff]">
           {/* Modal Header */}
@@ -115,7 +131,7 @@ const StudentHomeScreen: React.FC = () => {
             >
               Ongoing Lecture
             </Text>
-            <TouchableOpacity onPress={() => setIsAttendanceModalVisible(false)} className="p-2">
+            <TouchableOpacity onPress={closeAttendanceModal} className="p-2">
               <Ionicons name="close" size={28} color="black" />
             </TouchableOpacity>
           </View>
@@ -123,7 +139,7 @@ const StudentHomeScreen: React.FC = () => {
           {/* Lectures List */}
           <ScrollView className="flex-1">
             <View className="py-4">
-              <LectureCards />
+              <LectureCards refreshToken={lectureRefreshToken} />
             </View>
           </ScrollView>
         </SafeAreaView>

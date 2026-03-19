@@ -49,6 +49,7 @@ export default function TabLayout() {
         name="[class_id]"
         options={{
           href: null,
+          tabBarStyle: { display: 'none' },
         }}
       />
 

@@ -2,11 +2,14 @@ import React, { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useAuthStore } from "~/lib/store/auth.store";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import CustomSplashScreen from '~/components/layout/SplashScreen';
 
 export default function ProtectedLayout() {
     const router = useRouter();
     const segments = useSegments();
     const profile = useAuthStore((state) => state.profile);
+
+    const isTeacher = profile?.user_type === 'teacher';
 
     useEffect(() => {
         if (!profile) return;
@@ -20,20 +23,31 @@ export default function ProtectedLayout() {
             router.replace('/private/(student)/(tabs)');
         }
     }, [profile?.user_type, segments]);
-    
+
+    if (!profile) {
+        return <CustomSplashScreen message="Loading..." />;
+    }
+
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="(student)/(tabs)" />
-                <Stack.Screen name="(teacher)/(tabs)" />
+                {isTeacher ? (
+                    <>
+                        <Stack.Screen name="(teacher)/(tabs)" />
+                        <Stack.Screen name="(student)/(tabs)" />
+                    </>
+                ) : (
+                    <>
+                        <Stack.Screen name="(student)/(tabs)" />
+                        <Stack.Screen name="(teacher)/(tabs)" />
+                    </>
+                )}
 
-                
                 {/* Keep other protected screens accessible */}
                 <Stack.Screen name="editprofile" options={{ headerShown: false }} />
 
                 <Stack.Screen name="ble-student" />
                 <Stack.Screen name="ble-teacher" />
-                {/* <Stack.Screen name="editprofile" options={{ headerShown: false }} /> */}
             </Stack>
         </GestureHandlerRootView>
     );
