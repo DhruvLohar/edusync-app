@@ -102,7 +102,7 @@ const ProfileScreen: React.FC = () => {
                         <ProfileRow iconName="person-outline" title="Name" value={profile.name} />
                         <ProfileRow iconName="at-outline" title="Email" value={profile.email} />
                         <ProfileRow iconName="call-outline" title="Phone" value={profile.phone} />
-                        <ProfileRow iconName="reader-outline" title="Roll Number" value={profile.gr_no} />
+                        <ProfileRow iconName="reader-outline" title="Roll Number" value={profile.roll_no} />
                         <ProfileRow iconName="school-outline" title="User Type" value={profile.user_type} />
                     </View>
                     {/* Section 2: ACTIONS AND LOGOUT */}

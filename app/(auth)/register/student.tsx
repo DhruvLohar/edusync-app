@@ -91,7 +91,7 @@ const StudentRegistrationScreen = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
 
   // Academic Details
-  const [grNumber, setGrNumber] = useState('');
+  const [rollNumber, setRollNumber] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState<Year | null>(null);
   const [division, setDivision] = useState('');
@@ -126,7 +126,7 @@ const StudentRegistrationScreen = () => {
       formData.append('department', selectedDepartment || '');
       formData.append('year', selectedAcademicYear || '');
       formData.append('division', division);
-      formData.append('gr_no', grNumber);
+      formData.append('roll_no', rollNumber);
       if (capturedImageUri) {
         formData.append('profile_photo', { uri: capturedImageUri, name: 'profile.jpg', type: 'image/jpeg' } as any);
       }
@@ -143,7 +143,7 @@ const StudentRegistrationScreen = () => {
     } finally {
       setLoading(false);
     }
-  }, [embeddingSaved, fullName, phoneNumber, division, selectedDepartment, selectedAcademicYear, grNumber, capturedImageUri, authStore]);
+  }, [embeddingSaved, fullName, phoneNumber, division, selectedDepartment, selectedAcademicYear, rollNumber, capturedImageUri, authStore]);
 
   const handleNext = useCallback(() => {
     if (currentStep === 1) {
@@ -153,7 +153,7 @@ const StudentRegistrationScreen = () => {
       }
     }
     if (currentStep === 2) {
-      if (!grNumber.trim() || !selectedDepartment || !selectedAcademicYear || !division) {
+      if (!rollNumber.trim() || !selectedDepartment || !selectedAcademicYear || !division) {
         Alert.alert('Error', 'Please complete all academic details');
         return;
       }
@@ -165,7 +165,7 @@ const StudentRegistrationScreen = () => {
     } else {
       handleFinalRegister();
     }
-  }, [currentStep, fullName, phoneNumber, grNumber, selectedDepartment, selectedAcademicYear, division, handleFinalRegister]);
+  }, [currentStep, fullName, phoneNumber, rollNumber, selectedDepartment, selectedAcademicYear, division, handleFinalRegister]);
 
   const handleBack = useCallback(() => {
     if (currentStep > 1) {
@@ -184,7 +184,7 @@ const StudentRegistrationScreen = () => {
       const photoUri = `file://${photo.path}`;
       setCapturedImageUri(photoUri);
       const { embedding } = await getFaceEmbedding(photoUri);
-      const userId = `${fullName.trim()} - ${grNumber.trim()}`;
+      const userId = `${fullName.trim()} - ${rollNumber.trim()}`;
       await saveEmbedding(userId, embedding);
       setEmbeddingSaved(true);
       Alert.alert('Success', 'Face registered successfully!');
@@ -193,7 +193,7 @@ const StudentRegistrationScreen = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [fullName, grNumber]);
+  }, [fullName, rollNumber]);
 
   const handleBackToHome = useCallback(() => {
     setShowSuccessModal(false);
@@ -249,15 +249,6 @@ const StudentRegistrationScreen = () => {
                   <Text className="text-2xl font-bold text-black mb-1 max-w-[50%]" style={{ fontFamily: 'Poppins_600SemiBold' }}>Academic Details</Text>
                 </View>
                 <View className="gap-5 mb-12">
-                  <View>
-                    <Text className="text-base text-black font-medium -mb-3" style={{ fontFamily: 'Poppins_500Medium' }}>Roll no.</Text>
-                    <InputField placeholder="Enter Roll Number" value={grNumber} onChangeText={setGrNumber} onFocus={() => scrollToInput(150)} />
-                  </View>
-                  <View>
-                    <Text className="text-base text-black font-medium -mb-3" style={{ fontFamily: 'Poppins_500Medium' }}>Division</Text>
-                    <InputField placeholder="Enter Division" value={division} onChangeText={setDivision} onFocus={() => scrollToInput(150)} />
-                  </View>
-                  
                   <Text className="text-base text-black font-medium" style={{ fontFamily: 'Poppins_500Medium' }}>Department</Text>
                   <View className="flex-row flex-wrap gap-2.5">
                     {DEPARTMENT_OPTIONS.map((dept) => (
@@ -282,6 +273,16 @@ const StudentRegistrationScreen = () => {
                         <Text className={`text-sm ${selectedAcademicYear === year.key ? 'text-[#1E90FF] font-bold' : 'text-gray-700'}`}>{year.label}</Text>
                       </TouchableOpacity>
                     ))}
+                  </View>
+
+                  <View>
+                    <Text className="text-base text-black font-medium -mb-3 mt-2" style={{ fontFamily: 'Poppins_500Medium' }}>Division</Text>
+                    <InputField placeholder="Enter Division" value={division} onChangeText={setDivision} onFocus={() => scrollToInput(150)} />
+                  </View>
+
+                  <View>
+                    <Text className="text-base text-black font-medium -mb-3" style={{ fontFamily: 'Poppins_500Medium' }}>Roll No.</Text>
+                    <InputField placeholder="Enter Roll Number" value={rollNumber} onChangeText={setRollNumber} onFocus={() => scrollToInput(150)} />
                   </View>
                 </View>
                 <Button title="Next" onPress={handleNext} className="h-14 bg-[#1E90FF] rounded-xl" />

@@ -163,12 +163,12 @@ const LoginScreen = () => {
       const response = await authStore.verifyOTP(loginEmail, otp);
       if (response?.success) {
         setModalVisible(false);
-        if(!response.data.onboarding_done){
+        if (response.data.user_type === 'teacher') {
+          router.replace('/private/(teacher)/(tabs)');
+        } else if (!response.data.onboarding_done) {
           router.push('/register/student');
         } else {
-          response.data.user_type === 'teacher' 
-            ? router.replace('/private/(teacher)/(tabs)') 
-            : router.replace('/private/(student)/(tabs)');
+          router.replace('/private/(student)/(tabs)');
         }
       } else {
         Alert.alert('Verification Failed', response?.message || 'Invalid OTP.');

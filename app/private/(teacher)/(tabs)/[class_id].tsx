@@ -17,7 +17,7 @@ import type { Student as BLEStudent } from '~/lib/hook/useTeacherAttendance';
 import { renderAPIImage } from '~/lib/ImageChecker';
 
 interface EnrichedStudent {
-    gr_no: string;
+    roll_no: string;
     name: string;
     profile_photo: string | null;
     deviceAddress: string;
@@ -48,11 +48,11 @@ const TeacherAttendanceScreen: React.FC = () => {
         onStudentFound: useCallback((bleStudent: BLEStudent) => {
             console.log('[Teacher] BLE Student found:', bleStudent);
             
-            const grNo = bleStudent.rollno.toString();
+            const detectedRollNo = bleStudent.rollno.toString();
             
             // Update student with BLE data and mark present
             setStudents((prev) => prev.map(s => {
-                if (s.gr_no === grNo) {
+                if (s.roll_no === detectedRollNo) {
                     return {
                         ...s,
                         deviceAddress: bleStudent.deviceAddress,
@@ -67,7 +67,7 @@ const TeacherAttendanceScreen: React.FC = () => {
             // Auto-mark as present
             setAttendance((prev) => ({
                 ...prev,
-                [grNo]: 'present'
+                [detectedRollNo]: 'present'
             }));
         }, []),
         onAlertComplete: useCallback((success: number, failed: number) => {
@@ -89,9 +89,9 @@ const TeacherAttendanceScreen: React.FC = () => {
             // Initialize students list from API
             if (data.class?.students) {
                 const initialStudents: EnrichedStudent[] = data.class.students
-                    .filter(s => s.gr_no && s.name)
+                    .filter(s => s.roll_no && s.name)
                     .map(s => ({
-                        gr_no: s.gr_no!,
+                        roll_no: s.roll_no!,
                         name: s.name!,
                         profile_photo: s.profile_photo || null,
                         deviceAddress: '',
@@ -166,13 +166,13 @@ const TeacherAttendanceScreen: React.FC = () => {
         );
     };
 
-    const toggleAttendance = (gr_no: string) => {
+    const toggleAttendance = (roll_no: string) => {
         setAttendance((prev) => {
-            const current = prev[gr_no];
-            if (!current) return { ...prev, [gr_no]: 'present' };
-            if (current === 'present') return { ...prev, [gr_no]: 'absent' };
+            const current = prev[roll_no];
+            if (!current) return { ...prev, [roll_no]: 'present' };
+            if (current === 'present') return { ...prev, [roll_no]: 'absent' };
             // If absent, remove entry (back to unmarked)
-            const { [gr_no]: _, ...rest } = prev;
+            const { [roll_no]: _, ...rest } = prev;
             return rest;
         });
     };
@@ -197,8 +197,8 @@ const TeacherAttendanceScreen: React.FC = () => {
                             }
 
                             const attendanceData = students.map(student => ({
-                                gr_no: student.gr_no,
-                                status: attendance[student.gr_no] || 'absent',
+                                roll_no: student.roll_no,
+                                status: attendance[student.roll_no] || 'absent',
                             }));
 
                             Alert.alert('Success', 'Attendance submitted successfully!', [
@@ -217,8 +217,8 @@ const TeacherAttendanceScreen: React.FC = () => {
         );
     };
 
-    const getAttendanceStatus = (gr_no: string): 'present' | 'absent' | 'unmarked' => {
-        return attendance[gr_no] || 'unmarked';
+    const getAttendanceStatus = (roll_no: string): 'present' | 'absent' | 'unmarked' => {
+        return attendance[roll_no] || 'unmarked';
     };
 
     return (
@@ -335,12 +335,12 @@ const TeacherAttendanceScreen: React.FC = () => {
 
                     {students.length > 0 ? (
                         students.map((student) => {
-                            const status = getAttendanceStatus(student.gr_no);
+                            const status = getAttendanceStatus(student.roll_no);
                             const discovered = !!student.deviceAddress;
 
                             return (
                                 <View
-                                    key={student.gr_no}
+                                    key={student.roll_no}
                                     className="flex-row items-center justify-between py-3 border-b border-gray-100"
                                 >
                                     <View className="flex-row items-center flex-1">
@@ -356,7 +356,7 @@ const TeacherAttendanceScreen: React.FC = () => {
                                         )}
                                         <View className="flex-1">
                                             <Text className="text-gray-900 font-medium">{student.name}</Text>
-                                            <Text className="text-xs text-gray-500">GR: {student.gr_no}</Text>
+                                            <Text className="text-xs text-gray-500">Roll: {student.roll_no}</Text>
                                         </View>
                                         {discovered && (
                                             <View className="bg-green-100 px-2 py-1 rounded-full mr-2">
@@ -371,7 +371,7 @@ const TeacherAttendanceScreen: React.FC = () => {
                                     </View>
 
                                     <TouchableOpacity
-                                        onPress={() => toggleAttendance(student.gr_no)}
+                                        onPress={() => toggleAttendance(student.roll_no)}
                                         className={`w-12 h-12 rounded-lg items-center justify-center ${
                                             status === 'present' ? 'bg-green-500' : 
                                             status === 'absent' ? 'bg-red-500' : 'bg-gray-300'

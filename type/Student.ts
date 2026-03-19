@@ -1,7 +1,7 @@
 import type { User, Department, Year } from './user';
 
 export interface Student extends User {
-    gr_no?: string | null;
+    roll_no?: string | null;
     department?: Department | null;
     year?: Year | null;
     classes?: any[]; // You can replace 'any' with a Class[] type if defined

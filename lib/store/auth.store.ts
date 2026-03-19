@@ -11,7 +11,7 @@ interface APIResponse {
 }
 
 interface AuthState {
-  session: { access_token: string; user_type?: string } | null;
+  session: { access_token: string; user_type?: UserType } | null;
   profile: User | null;
   isLoading: boolean;
   isSessionInitialized: boolean;
@@ -44,13 +44,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const res: APIResponse = await postToAPI('/users/auth/verify-otp', { email, otp }, false, false);
     
     if (res.success) {
-      const sessionData = {
+      const sessionData: { access_token: string; user_type?: UserType } = {
         access_token: res.data.access_token,
-        user_type: res.data.user_type,
+        user_type: res.data.user_type as UserType,
       };
       set({ session: sessionData });
       await setStorageItemAsync(STORAGE_KEY, sessionData); // Save to SecureStore
-      res.data.onboarding_done && (await get().refreshUser());
+      if (res.data.onboarding_done || res.data.user_type === 'teacher') {
+        await get().refreshUser();
+      } else {
+        set({ profile: null });
+      }
     }
 
     return res;

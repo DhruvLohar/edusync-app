@@ -45,7 +45,7 @@ export interface User {
 
     // college specific
     employee_id?: string | null;
-    gr_no?: string | null;
+    roll_no?: string | null;
     department?: Department | null;
     year?: Year | null;
 

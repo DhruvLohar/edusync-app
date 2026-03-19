@@ -30,7 +30,10 @@ export default function RootLayout() {
     Poppins_700Bold,
   });
 
-  const isLoggedIn = !!(session && profile);
+  const isLoggedIn = !!session;
+  const shouldAllowOnboarding =
+    session?.user_type === 'student' && (!profile || !profile.onboarding_done);
+  const showAuthRoutes = !isLoggedIn || shouldAllowOnboarding;
 
   useEffect(() => {
     if (fontsLoaded) {
@@ -47,7 +50,7 @@ export default function RootLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       {/* Auth routes - only when NOT logged in */}
-      <Stack.Protected guard={!isLoggedIn}>
+      <Stack.Protected guard={showAuthRoutes}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="index" />
       </Stack.Protected>

@@ -34,7 +34,7 @@ function LectureCards() {
     try {
       router.push({
         pathname: '/private/(student)/(tabs)/[class_id]',
-        params: { class_id: lecture?.id.toString() as string, live_id: `${lecture?.live_id}${profile?.gr_no}` },
+        params: { class_id: lecture?.id.toString() as string, live_id: `${lecture?.live_id}${profile?.roll_no || ''}` },
       });
     } catch (error) {
       console.error('Navigation error:', error);
