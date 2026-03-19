@@ -1,108 +1,85 @@
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
-  Dimensions,
   TouchableOpacity,
-  Platform,
   SafeAreaView,
 } from "react-native";
 import { useRouter } from 'expo-router';
-
-const { width, height } = Dimensions.get("window");
 
 const slides = [
   {
     id: "1",
     title: "Smart Attendance Made Simple",
-    description:
-      "Experience automatic attendance marking with Bluetooth technology. No manual input needed, the system does the rest.",
-    backgroundColor: "#EAF5FF",
+    description: "Experience automatic attendance marking with Bluetooth technology. No manual input needed, the system does the rest.",
   },
   {
     id: "2",
     title: "Seamless Teacher–Student Sync",
-    description:
-      "Connect effortlessly with beacons and devices nearby for a truly smart classroom experience.",
-    backgroundColor: "#EAF5FF",
+    description: "Connect effortlessly with beacons and devices nearby for a truly smart classroom experience.",
   },
   {
     id: "3",
     title: "Reliable. Fast. Effortless.",
-    description:
-      "Sign in, connect your device, and let the app handle attendance automatically.",
-    backgroundColor: "#EAF5FF",
+    description: "Sign in, connect your device, and let the app handle attendance automatically.",
   },
 ];
 
-const onboarding = ({ navigation }: any) => {
+const Onboarding = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const slidesRef = useRef<FlatList>(null);
   const router = useRouter();
 
-const handleNext = () => {
-  if (currentIndex < slides.length - 1) {
-    slidesRef.current?.scrollToIndex({ index: currentIndex + 1 });
-    setCurrentIndex(currentIndex + 1);
-  } else {
-    // Navigate to login page inside (auth)
-    router.replace('/(auth)');
-  }
-};
+  const handleNext = () => {
+    if (currentIndex < slides.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+    } else {
+      router.replace('/(auth)');
+    }
+  };
 
+  const currentSlide = slides[currentIndex];
 
   return (
     <SafeAreaView style={styles.container}>
-      <FlatList
-        data={slides}
-        renderItem={({ item }) => (
-          <View
-            style={[styles.slide, { backgroundColor: item.backgroundColor }]}
-          >
-    <View style={styles.bottomSheet}>
-              {/* Pagination Dots */}
-              <View style={styles.pagination}>
-                {slides.map((_, i) => (
-                  <View
-                    key={i}
-                    style={[
-                      styles.dot,
-                      {
-                        opacity: i === currentIndex ? 1 : 0.3,
-                        width: i === currentIndex ? 20 : 8,
-                      },
-                    ]}
-                  />
-                ))}
-              </View>
+      {/* Top Section: Stays empty and static */}
+      <View style={styles.topSection} />
 
-              {/* Title + Description */}
-              <Text style={styles.title}>{item.title}</Text>
-              <Text style={styles.description}>{item.description}</Text>
+      {/* Static Bottom Sheet: Height and position are fixed */}
+      <View style={styles.bottomSheet}>
+        {/* Pagination Dots */}
+        <View style={styles.pagination}>
+          {slides.map((_, i) => (
+            <View
+              key={i}
+              style={[
+                styles.dot,
+                {
+                  opacity: i === currentIndex ? 1 : 0.3,
+                  width: i === currentIndex ? 20 : 8,
+                },
+              ]}
+            />
+          ))}
+        </View>
 
-              {/* Blue Button */}
-              <TouchableOpacity
-                style={styles.button}
-                onPress={handleNext}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.buttonText}>
-                  {currentIndex === slides.length - 1
-                    ? "Get Started"
-                    : "Next"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        scrollEnabled={false}
-        ref={slidesRef}
-      />
+        {/* Dynamic Text: Only this part changes */}
+        <View style={styles.contentContainer}>
+          <Text style={styles.title}>{currentSlide.title}</Text>
+          <Text style={styles.description}>{currentSlide.description}</Text>
+        </View>
+
+        {/* Fixed Button */}
+        <TouchableOpacity
+          style={styles.button}
+          onPress={handleNext}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.buttonText}>
+            {currentIndex === slides.length - 1 ? "Get Started" : "Next"}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };
@@ -112,25 +89,23 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#EAF5FF",
   },
-  slide: {
-    width,
-    height,
-    justifyContent: "flex-end",
-    alignItems: "center",
+  topSection: {
+    flex: 1, // Pushes the bottom sheet down
   },
   bottomSheet: {
     backgroundColor: "#fff",
     width: "100%",
+    height: 350, // Strictly fixed height as requested
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingHorizontal: 28,
-    paddingTop: 20,
+    paddingTop: 30,
     paddingBottom: 40,
     alignItems: "center",
+    justifyContent: "space-between", // Keeps elements spaced out within the fixed height
   },
   pagination: {
     flexDirection: "row",
-    marginBottom: 14,
   },
   dot: {
     height: 8,
@@ -138,23 +113,24 @@ const styles = StyleSheet.create({
     backgroundColor: "#007AFF",
     marginHorizontal: 4,
   },
+  contentContainer: {
+    alignItems: "center",
+    width: '100%',
+  },
   title: {
-    fontSize: 30,
+    fontSize: 28,
     color: "#000",
     textAlign: "center",
-    marginBottom: 10,
-    lineHeight: 40,
-    marginTop: 30,
-    
+    lineHeight: 36,
+    fontWeight: '700',
     fontFamily: 'Poppins_600SemiBold',
   },
   description: {
     fontSize: 15,
     color: "#777",
-    textAlign: "justify",
+    textAlign: "center",
     lineHeight: 22,
-    marginBottom: 28,
-    marginTop: 20,
+    marginTop: 15,
     fontFamily: 'Poppins_400Regular',
   },
   button: {
@@ -164,7 +140,6 @@ const styles = StyleSheet.create({
     height: 56,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 10, 
   },
   buttonText: {
     color: "#fff",
@@ -174,4 +149,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default onboarding;
+export default Onboarding;
