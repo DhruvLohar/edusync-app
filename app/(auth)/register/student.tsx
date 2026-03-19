@@ -94,7 +94,7 @@ const StudentRegistrationScreen = () => {
   const [grNumber, setGrNumber] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState<Year | null>(null);
-  const [division, setDivision] = useState(''); 
+  const [division, setDivision] = useState('');
 
   // Face Recognition
   const [capturedImageUri, setCapturedImageUri] = useState<string | null>(null);
@@ -125,6 +125,7 @@ const StudentRegistrationScreen = () => {
       formData.append('user_type', 'student');
       formData.append('department', selectedDepartment || '');
       formData.append('year', selectedAcademicYear || '');
+      formData.append('division', division);
       formData.append('gr_no', grNumber);
       if (capturedImageUri) {
         formData.append('profile_photo', { uri: capturedImageUri, name: 'profile.jpg', type: 'image/jpeg' } as any);
