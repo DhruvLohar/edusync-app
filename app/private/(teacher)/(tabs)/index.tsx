@@ -1,13 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StatusBar, ScrollView, TouchableOpacity, Dimensions, StyleSheet, Image, Modal } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { fetchFromAPI } from '~/lib/api';
 import { renderAPIImage } from '~/lib/ImageChecker';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Student } from '~/type/Student';
 import { useAuthStore } from '~/lib/store/auth.store';
 import AllClasses from '~/components/custom/teacherHome/AllClasses';
+import { useTeacherHistory, useTeacherClasses } from '~/lib/hook/api/useTeacher';
 
 interface ClassAttendance {
     id: string;
@@ -101,54 +100,9 @@ const AttendanceCard: React.FC<ClassAttendance> = ({ name, department, time, dat
 const HomeScreen: React.FC = () => {
 
     const profile = useAuthStore((state) => state.profile);
-
-    const [classes, setClasses] = useState<ClassAttendance[]>([]);
-    const [lectures, setLectures] = useState<TeacherClass[]>([]);
+    const { data: classes } = useTeacherHistory();
+    const { data: lectures } = useTeacherClasses();
     const [showClassModal, setShowClassModal] = useState(false);
-
-    const fetchHistory = async () => {
-        const res = await fetchFromAPI<any>('/teachers/history');
-
-        if (res && res.success && Array.isArray(res.data)) {
-            // Map backend data to ClassAttendance[]
-            const mapped = res.data.map((attendance: any) => {
-                const classInfo = attendance.class || {};
-                const presentCount = attendance.summary?.total_present || 0;
-                const totalCapacity = attendance.summary?.total_students || 0;
-                const progress = totalCapacity > 0 ? presentCount / totalCapacity : 0;
-                // Format time and date
-                const start = attendance.start_time ? new Date(attendance.start_time) : null;
-                const end = attendance.end_time ? new Date(attendance.end_time) : null;
-                const time = start && end ? `${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : '';
-                const date = start ? start.toLocaleDateString() : '';
-                return {
-                    id: attendance.id.toString(),
-                    name: classInfo.subject || '',
-                    department: classInfo.department || '',
-                    time,
-                    date,
-                    presentCount,
-                    totalCapacity,
-                    progress,
-                };
-            });
-            setClasses(mapped);
-        } else {
-            setClasses([]);
-        }
-    };
-
-    async function fetchLectures() {
-        const res = await fetchFromAPI('teachers/fetch-classes');
-
-        if (res && res.success) {
-            setLectures(res.data);
-        }
-    }
-
-    useEffect(() => {
-        fetchLectures();
-    }, []);
 
     const getGreeting = () => {
         const hour = new Date().getHours();

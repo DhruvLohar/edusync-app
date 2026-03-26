@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { postToAPI } from '~/lib/api';
 import { TeacherClass } from '~/app/private/(teacher)/(tabs)';
 import StartAttendanceModal from './StartAttendanceModal';
+import { useStartAttendance } from '~/lib/hook/api/useTeacher';
 
 function AllClasses({ classes }: { classes: TeacherClass[] }) {
   const router = useRouter();
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [isStartingAttendance, setIsStartingAttendance] = useState(false);
   const [selectedClass, setSelectedClass] = useState<TeacherClass | null>(null);
+  const { startAttendance, isPending: isStartingAttendance } = useStartAttendance();
 
   const handleCardPress = async (lecture: TeacherClass) => {
     const { attendance_exists, attendance_live_id } = lecture;
@@ -32,8 +32,7 @@ function AllClasses({ classes }: { classes: TeacherClass[] }) {
     lecture_time: string;
   }) => {
     try {
-      setIsStartingAttendance(true);
-      const res = await postToAPI('teachers/start-attendance', payload);
+      const res = await startAttendance(payload);
       if (res && res.success) {
         setIsModalVisible(false);
         router.push({
@@ -48,8 +47,6 @@ function AllClasses({ classes }: { classes: TeacherClass[] }) {
       }
     } catch (error) {
       console.error('Navigation error:', error);
-    } finally {
-      setIsStartingAttendance(false);
     }
   };
 

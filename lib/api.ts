@@ -5,6 +5,18 @@ export const API_URL = 'https://edusync-backend-ten.vercel.app';
 
 axios.defaults.baseURL = API_URL;
 
+// Authenticated axios instance for TanStack Query hooks
+export const apiClient = axios.create({ baseURL: API_URL });
+
+apiClient.interceptors.request.use(async (config) => {
+    const sessionString = await SecureStore.getItemAsync('session');
+    const session: Session = sessionString ? JSON.parse(sessionString) : {};
+    if (session.access_token) {
+        config.headers.Authorization = `Bearer ${session.access_token}`;
+    }
+    return config;
+});
+
 interface Session {
     access_token?: string;
     // Add other session properties if needed   

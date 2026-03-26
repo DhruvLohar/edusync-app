@@ -3,6 +3,7 @@ import { fetchFromAPI, postToAPI } from '~/lib/api';
 import { getStorageItemAsync, setStorageItemAsync } from '~/lib/useStorageState';
 import { Alert } from 'react-native';
 import { User, UserType, Department, Year } from '~/type/user';
+import { queryClient } from '~/lib/queryClient';
 
 interface APIResponse {
   success: boolean;
@@ -71,6 +72,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   async logOut() {
     await setStorageItemAsync(STORAGE_KEY, null);
     set({ session: null, profile: null, isSessionInitialized: false });
+    // Clear all React Query cache to prevent stale data on next login
+    queryClient.clear();
   },
 
   rehydrateSession: async () => {

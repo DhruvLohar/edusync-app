@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
     View,
     Text,
@@ -11,8 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { fetchFromAPI, postToAPI } from '~/lib/api';
-import { Attendance } from '~/type/Teacher';
+import { useAttendanceDetails, useSubmitAttendance, useEndAttendance } from '~/lib/hook/api/useTeacherAttendance';
 import { useTeacherAttendance } from '~/lib/hook/useTeacherAttendance';
 import type { Student as BLEStudent } from '~/lib/hook/useTeacherAttendance';
 import { renderAPIImage } from '~/lib/ImageChecker';
@@ -33,7 +32,9 @@ const TeacherAttendanceScreen: React.FC = () => {
     const router = useRouter();
     const { class_id, live_id } = useLocalSearchParams<{ class_id: string; live_id: string }>();
 
-    const [attendanceDetails, setAttendanceDetails] = useState<Attendance | null>(null);
+    const { data: attendanceDetails } = useAttendanceDetails(class_id ?? '');
+    const { submitAttendance } = useSubmitAttendance();
+    const { endAttendance } = useEndAttendance();
     const [students, setStudents] = useState<EnrichedStudent[]>([]);
     const [attendance, setAttendance] = useState<Record<string, 'present' | 'absent'>>({});
     const [showExitSheet, setShowExitSheet] = useState(false);
@@ -47,6 +48,10 @@ const TeacherAttendanceScreen: React.FC = () => {
         startScanning,
         stopScanning,
         sendAlerts,
+        verifyingAddress,
+        isVerifying,
+        verifyStudentsSequentially,
+        cancelVerification,
     } = useTeacherAttendance({
         classPrefix: live_id || '',
         onStudentFound: useCallback((bleStudent: BLEStudent) => {
@@ -93,53 +98,72 @@ const TeacherAttendanceScreen: React.FC = () => {
         return () => sub.remove();
     }, []);
 
-    const confirmExit = async () => {
+    const confirmExit = useCallback(async () => {
         setShowExitSheet(false);
         if (scanning) stopScanning();
 
-        // End the attendance session as abnormal (exited without submitting)
         if (class_id) {
-            await postToAPI('teachers/end-attendance', {
-                attendance_id: Number(class_id),
-                ended_abnormally: true,
-            });
+            await endAttendance({ attendance_id: Number(class_id), ended_abnormally: true });
         }
 
         allowExitRef.current = true;
         router.back();
-    };
+    }, [scanning, stopScanning, class_id, endAttendance, router]);
 
-    async function fetchLiveAttendanceDetails() {
-        const res = await fetchFromAPI('teachers/attendance/' + class_id);
-
-        if (res && res.success) {
-            const data: Attendance = res.data;
-            setAttendanceDetails(data);
-            console.log('[Teacher] Attendance details loaded:', data.class?.students?.length, 'students');
-            
-            // Initialize students list from API
-            if (data.class?.students) {
-                const initialStudents: EnrichedStudent[] = data.class.students
-                    .filter(s => s.roll_no && s.name)
-                    .map(s => ({
-                        roll_no: s.roll_no!,
-                        name: s.name!,
-                        profile_photo: s.profile_photo || null,
-                        deviceAddress: '',
-                        rssi: 0,
-                        discoveredAt: 0,
-                        verified: false,
-                        attendanceStatus: 'unmarked' as const,
-                    }));
-                setStudents(initialStudents);
-            }
-        }
-    }
-
+    // Populate students list when attendance details arrive from query
     useEffect(() => {
-        console.log("Teacher  : ", class_id, live_id);
-        fetchLiveAttendanceDetails();
-    }, [class_id, live_id]);
+        if (!attendanceDetails?.class?.students) return;
+        console.log('[Teacher] Attendance details loaded:', attendanceDetails.class.students.length, 'students');
+        const initialStudents: EnrichedStudent[] = attendanceDetails.class.students
+            .filter(s => s.roll_no && s.name)
+            .map(s => ({
+                roll_no: s.roll_no!,
+                name: s.name!,
+                profile_photo: s.profile_photo || null,
+                deviceAddress: '',
+                rssi: 0,
+                discoveredAt: 0,
+                verified: false,
+                attendanceStatus: 'unmarked' as const,
+            }));
+        setStudents(initialStudents);
+    }, [attendanceDetails]);
+
+    const verifyHighlightStyle = useMemo(() => ({
+        borderWidth: 2,
+        borderColor: '#3B82F6',
+        borderRadius: 8,
+        padding: 8,
+    }), []);
+
+    const handleVerifyPresent = useCallback(() => {
+        const presentWithDevice = students.filter(
+            s => attendance[s.roll_no] === 'present' && s.deviceAddress
+        );
+
+        if (presentWithDevice.length === 0) {
+            Alert.alert('No Students', 'No present-marked students with BLE connections found.');
+            return;
+        }
+
+        Alert.alert(
+            'Verify Students',
+            `Sequentially alert ${presentWithDevice.length} present students for verification?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Start',
+                    onPress: () => {
+                        const toVerify = presentWithDevice.map(s => ({
+                            rollno: parseInt(s.roll_no),
+                            deviceAddress: s.deviceAddress,
+                        }));
+                        verifyStudentsSequentially(toVerify);
+                    },
+                },
+            ]
+        );
+    }, [students, attendance, verifyStudentsSequentially]);
 
     const handleToggleAttendance = async () => {
         if (scanning) {
@@ -231,7 +255,7 @@ const TeacherAttendanceScreen: React.FC = () => {
                                 status: attendance[student.roll_no] || 'absent',
                             }));
 
-                            const res = await postToAPI('teachers/submit-attendance', {
+                            const res = await submitAttendance({
                                 attendance_id: Number(class_id),
                                 records,
                             });
@@ -344,6 +368,29 @@ const TeacherAttendanceScreen: React.FC = () => {
                     </TouchableOpacity>
                 )}
 
+                {/* Verify Present Students Button */}
+                {Object.values(attendance).some(s => s === 'present') && (
+                    <TouchableOpacity
+                        onPress={isVerifying ? cancelVerification : handleVerifyPresent}
+                        className={`w-full py-4 rounded-xl items-center justify-center mt-3 ${
+                            isVerifying ? 'bg-orange-500' : 'bg-purple-500'
+                        }`}
+                        activeOpacity={0.8}
+                        disabled={isAlerting}
+                    >
+                        <View className="flex-row items-center">
+                            <MaterialCommunityIcons
+                                name={isVerifying ? 'stop-circle' : 'account-check'}
+                                size={24}
+                                color="white"
+                            />
+                            <Text className="text-white text-lg font-semibold ml-2">
+                                {isVerifying ? 'Stop Verification' : 'Verify Present Students'}
+                            </Text>
+                        </View>
+                    </TouchableOpacity>
+                )}
+
                 {/* Submit Attendance Button */}
                 {students.length > 0 && (
                     <TouchableOpacity
@@ -382,6 +429,7 @@ const TeacherAttendanceScreen: React.FC = () => {
                                 <View
                                     key={student.roll_no}
                                     className="flex-row items-center justify-between py-3 border-b border-gray-100"
+                                    style={verifyingAddress === student.deviceAddress && student.deviceAddress ? verifyHighlightStyle : undefined}
                                 >
                                     <View className="flex-row items-center flex-1">
                                         {student.profile_photo ? (

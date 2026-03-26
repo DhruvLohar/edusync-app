@@ -1,4 +1,6 @@
 import { useAuthStore } from '~/lib/store/auth.store';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '~/lib/queryClient';
 import '../global.css';
 
 import { SplashScreen, Stack } from 'expo-router';
@@ -48,17 +50,19 @@ export default function RootLayout() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      {/* Auth routes - only when NOT logged in */}
-      <Stack.Protected guard={showAuthRoutes}>
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="index" />
-      </Stack.Protected>
+    <QueryClientProvider client={queryClient}>
+      <Stack screenOptions={{ headerShown: false }}>
+        {/* Auth routes - only when NOT logged in */}
+        <Stack.Protected guard={showAuthRoutes}>
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="index" />
+        </Stack.Protected>
 
-      {/* Private routes - only when logged in */}
-      <Stack.Protected guard={isLoggedIn}>
-        <Stack.Screen name="private" />
-      </Stack.Protected>
-    </Stack>
+        {/* Private routes - only when logged in */}
+        <Stack.Protected guard={isLoggedIn}>
+          <Stack.Screen name="private" />
+        </Stack.Protected>
+      </Stack>
+    </QueryClientProvider>
   );
 }

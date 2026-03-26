@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useAuthStore } from "~/lib/store/auth.store";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
 import CustomSplashScreen from '~/components/layout/SplashScreen';
 
 export default function ProtectedLayout() {
@@ -29,26 +28,24 @@ export default function ProtectedLayout() {
     }
 
     return (
-        <GestureHandlerRootView style={{ flex: 1 }}>
-            <Stack screenOptions={{ headerShown: false }}>
-                {isTeacher ? (
-                    <>
-                        <Stack.Screen name="(teacher)/(tabs)" />
-                        <Stack.Screen name="(student)/(tabs)" />
-                    </>
-                ) : (
-                    <>
-                        <Stack.Screen name="(student)/(tabs)" />
-                        <Stack.Screen name="(teacher)/(tabs)" />
-                    </>
-                )}
+        <Stack screenOptions={{ headerShown: false }}>
+            {isTeacher ? (
+                <>
+                    <Stack.Screen name="(teacher)/(tabs)" />
+                    <Stack.Screen name="(student)/(tabs)" />
+                </>
+            ) : (
+                <>
+                    <Stack.Screen name="(student)/(tabs)" />
+                    <Stack.Screen name="(teacher)/(tabs)" />
+                </>
+            )}
 
-                {/* Keep other protected screens accessible */}
-                <Stack.Screen name="editprofile" options={{ headerShown: false }} />
+            {/* Keep other protected screens accessible */}
+            <Stack.Screen name="editprofile" options={{ headerShown: false }} />
 
-                <Stack.Screen name="ble-student" />
-                <Stack.Screen name="ble-teacher" />
-            </Stack>
-        </GestureHandlerRootView>
+            <Stack.Screen name="ble-student" />
+            <Stack.Screen name="ble-teacher" />
+        </Stack>
     );
 }

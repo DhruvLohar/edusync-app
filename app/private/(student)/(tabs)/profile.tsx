@@ -1,19 +1,17 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React from 'react';
 import { View, Text, StatusBar, ScrollView, TouchableOpacity, StyleSheet, Image, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { fetchFromAPI } from '~/lib/api';
 import { useAuthStore } from '~/lib/store/auth.store';
 import { renderAPIImage } from '~/lib/ImageChecker';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useProfile } from '~/lib/hook/api/useStudent';
 
 // --- MAIN SCREEN COMPONENT ---
 const ProfileScreen: React.FC = () => {
     const router = useRouter();
-    const [profile, setProfile] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
-    const [refreshing, setRefreshing] = useState(false);
     const Authstore = useAuthStore();
+    const { data: profile, isLoading: loading, isRefetching: refreshing, refetch } = useProfile();
 
     const handleAction = async (action: string) => {
         if (action === 'Log Out') {
@@ -21,29 +19,6 @@ const ProfileScreen: React.FC = () => {
             router.replace('/(auth)');
         }
     };
-
-    const fetchProfile = useCallback(async (isRefresh = false) => {
-        if (isRefresh) {
-            setRefreshing(true);
-        } else {
-            setLoading(true);
-        }
-
-        const res = await fetchFromAPI<any>('/users/profile');
-
-        if (res && res.success && res.data) {
-            setProfile(res.data);
-        } else {
-            setProfile(null);
-        }
-
-        setLoading(false);
-        setRefreshing(false);
-    }, []);
-
-    useEffect(() => {
-        fetchProfile();
-    }, [fetchProfile]);
 
     if (loading) {
         return (
@@ -71,7 +46,7 @@ const ProfileScreen: React.FC = () => {
                 showsVerticalScrollIndicator={false}
                 style={styles.container}
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={() => fetchProfile(true)} />
+                    <RefreshControl refreshing={refreshing} onRefresh={refetch} />
                 }
             >
                 {/* --- HEADER AND PROFILE INFO --- */}

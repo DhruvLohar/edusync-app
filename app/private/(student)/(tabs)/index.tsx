@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,51 +11,30 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { fetchFromAPI } from '~/lib/api';
 import { renderAPIImage } from '~/lib/ImageChecker';
 import AttendanceOverview from '~/components/custom/studentHome/AttendanceOverview';
 import TodaysLecture from '~/components/custom/studentHome/AttendanceHistory';
 import LectureCards from '~/components/custom/studentHome/LectureCards';
-import type { AttendanceRecord } from '~/type/Student';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '~/lib/store/auth.store';
+import { useStudentHistory } from '~/lib/hook/api/useStudentAttendance';
 
 
 // --- MAIN SCREEN COMPONENT ---
 const StudentHomeScreen: React.FC = () => {
 
   const profile = useAuthStore((state) => state.profile);
-  const [history, setHistory] = useState<AttendanceRecord[]>([]);
+  const { data: history, refetch: refetchHistory } = useStudentHistory();
   const [isAttendanceModalVisible, setIsAttendanceModalVisible] = useState(false);
-  const [lectureRefreshToken, setLectureRefreshToken] = useState(0);
-
-  const fetchHistory = useCallback(async () => {
-    const res = await fetchFromAPI<{ records: AttendanceRecord[] }>('/students/history');
-    if (res && res.success && res.data && Array.isArray(res.data.records)) {
-      setHistory(res.data.records);
-      return;
-    }
-    setHistory([]);
-  }, []);
-
-  useEffect(() => {
-    fetchHistory();
-  }, [fetchHistory]);
-
-  useEffect(() => {
-    const interval = setInterval(fetchHistory, 30000);
-    return () => clearInterval(interval);
-  }, [fetchHistory]);
 
   const openAttendanceModal = useCallback(() => {
-    setLectureRefreshToken((prev) => prev + 1);
     setIsAttendanceModalVisible(true);
   }, []);
 
   const closeAttendanceModal = useCallback(() => {
     setIsAttendanceModalVisible(false);
-    fetchHistory();
-  }, [fetchHistory]);
+    refetchHistory();
+  }, [refetchHistory]);
 
   return (
     <SafeAreaView className="flex-1">
@@ -139,7 +118,7 @@ const StudentHomeScreen: React.FC = () => {
           {/* Lectures List */}
           <ScrollView className="flex-1">
             <View className="py-4">
-              <LectureCards refreshToken={lectureRefreshToken} />
+              <LectureCards />
             </View>
           </ScrollView>
         </SafeAreaView>

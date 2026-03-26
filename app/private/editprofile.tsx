@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -21,7 +21,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { InputField } from '~/components/ui/Input';
 import { Button } from '~/components/ui/Button';
 import { useAuthStore } from '~/lib/store/auth.store';
-import { postToAPI } from '~/lib/api';
+import { useUpdateProfile } from '~/lib/hook/api/useStudent';
 
 // Validation Schema
 const editProfileSchema = z.object({
@@ -35,7 +35,7 @@ type EditProfileFormData = z.infer<typeof editProfileSchema>;
 export default function EditProfileScreen() {
     const router = useRouter();
     const { profile, refreshUser } = useAuthStore();
-    const [isLoading, setIsLoading] = useState(false);
+    const { updateProfile, isPending: isLoading } = useUpdateProfile();
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [hasImageChanged, setHasImageChanged] = useState(false);
 
@@ -113,15 +113,12 @@ export default function EditProfileScreen() {
     };
 
     const onSubmit = async (data: EditProfileFormData) => {
-        setIsLoading(true);
-
         try {
             const formData = new FormData();
             formData.append("name", data.name);
             formData.append("email", data.email);
             formData.append("phone", data.phone);
 
-            // Only include profile_photo if the user has changed it
             if (hasImageChanged && selectedImage) {
                 const imageUri = selectedImage;
                 const filename = imageUri.split('/').pop() || 'profile.jpg';
@@ -135,21 +132,14 @@ export default function EditProfileScreen() {
                 } as any);
             }
 
-            const res = await postToAPI("/users/update-profile", formData, true);
+            const res = await updateProfile(formData);
 
             if (res.success) {
-                // Refresh user profile in store
                 await refreshUser();
-                
                 Alert.alert(
-                    'Success!', 
+                    'Success!',
                     'Your profile has been updated successfully.',
-                    [
-                        {
-                            text: 'OK',
-                            onPress: () => router.back()
-                        }
-                    ]
+                    [{ text: 'OK', onPress: () => router.back() }]
                 );
             } else {
                 Alert.alert('Error', res.message || 'Failed to update profile. Please try again.');
@@ -157,8 +147,6 @@ export default function EditProfileScreen() {
         } catch (error) {
             console.error('Profile update error:', error);
             Alert.alert('Error', 'Failed to update profile. Please try again.');
-        } finally {
-            setIsLoading(false);
         }
     };
 

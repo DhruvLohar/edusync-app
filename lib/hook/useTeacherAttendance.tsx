@@ -35,6 +35,10 @@ export function useTeacherAttendance({
     const [alertProgress, setAlertProgress] = useState({ current: 0, total: 0 });
     const [isAlerting, setIsAlerting] = useState(false);
     const [bluetoothEnabled, setBluetoothEnabled] = useState(true);
+    const [verifyingAddress, setVerifyingAddress] = useState<string | null>(null);
+    const [isVerifying, setIsVerifying] = useState(false);
+    const verificationCancelledRef = useRef(false);
+    const verificationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const subscriptions = useRef<EventSubscription[]>([]);
 
     // Setup event listeners
@@ -168,6 +172,65 @@ export function useTeacherAttendance({
         return result;
     }, [students, onAlertComplete]);
 
+    // Send alert to a single student
+    const sendAlertToOne = useCallback(async (deviceAddress: string) => {
+        const result = await ExpoBleCore.sendAlertToStudent(
+            deviceAddress,
+            BleConstants.ALERT_TYPE_BEEP
+        );
+        return result;
+    }, []);
+
+    // Sequentially verify present students one by one
+    const verifyStudentsSequentially = useCallback(async (
+        studentsToVerify: Array<{ rollno: number; deviceAddress: string }>
+    ) => {
+        setIsVerifying(true);
+        verificationCancelledRef.current = false;
+
+        for (const student of studentsToVerify) {
+            if (verificationCancelledRef.current) break;
+
+            setVerifyingAddress(student.deviceAddress);
+            await sendAlertToOne(student.deviceAddress);
+
+            if (verificationCancelledRef.current) break;
+
+            // Pause between students so teacher can observe
+            await new Promise<void>(resolve => {
+                verificationTimeoutRef.current = setTimeout(() => {
+                    verificationTimeoutRef.current = null;
+                    resolve();
+                }, 1500);
+            });
+        }
+
+        setVerifyingAddress(null);
+        setIsVerifying(false);
+    }, [sendAlertToOne]);
+
+    // Cancel ongoing verification
+    const cancelVerification = useCallback(() => {
+        verificationCancelledRef.current = true;
+        if (verificationTimeoutRef.current) {
+            clearTimeout(verificationTimeoutRef.current);
+            verificationTimeoutRef.current = null;
+        }
+        setVerifyingAddress(null);
+        setIsVerifying(false);
+    }, []);
+
+    // Cleanup verification on unmount
+    useEffect(() => {
+        return () => {
+            verificationCancelledRef.current = true;
+            if (verificationTimeoutRef.current) {
+                clearTimeout(verificationTimeoutRef.current);
+                verificationTimeoutRef.current = null;
+            }
+        };
+    }, []);
+
     // Get attendance report
     const getAttendanceReport = useCallback(() => {
         const report = ExpoBleCore.getDiscoveredStudents();
@@ -199,12 +262,17 @@ export function useTeacherAttendance({
         alertProgress,
         isAlerting,
         bluetoothEnabled,
+        verifyingAddress,
+        isVerifying,
 
         // Functions
         requestPermissions,
         startScanning,
         stopScanning,
         sendAlerts,
+        sendAlertToOne,
+        verifyStudentsSequentially,
+        cancelVerification,
         getAttendanceReport,
         isBluetoothEnabled,
         clearStudents,

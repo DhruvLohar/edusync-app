@@ -29,10 +29,9 @@ import {
   loadEmbedding,
   compareEmbeddings,
 } from '~/lib/ImageChecker';
-import { fetchFromAPI } from '~/lib/api';
-import { Attendance } from '~/type/Teacher';
 import { useAuthStore } from '~/lib/store/auth.store';
 import { useStudentAttendance } from '~/lib/hook/useStudentAttendance';
+import { useAttendanceDetails } from '~/lib/hook/api/useStudentAttendance';
 import { useAudio } from '~/lib/hook/useAudio';
 import ExitConfirmSheet from '~/components/ExitConfirmSheet';
 
@@ -48,7 +47,6 @@ const StudentHomeScreen: React.FC = () => {
   // --- STATE ---
   const [showExitSheet, setShowExitSheet] = useState(false);
   const allowExitRef = useRef(false);
-  const [attendanceDetails, setAttendanceDetails] = useState<Attendance | null>(null);
   const [scanPhase, setScanPhase] = useState<ScanPhase>('idle');
   const [registeredUser, setRegisteredUser] = useState<string | null>(null);
   const [capturedImageUri, setCapturedImageUri] = useState<string | null>(null);
@@ -81,6 +79,9 @@ const StudentHomeScreen: React.FC = () => {
     console.log('✅ BLE Check-out successful');
   }, []);
 
+  // --- ATTENDANCE DETAILS ---
+  const { data: attendanceDetails } = useAttendanceDetails(class_id ?? '');
+
   // --- BLE ATTENDANCE HOOK ---
   const {
     checkedIn,
@@ -112,15 +113,6 @@ const StudentHomeScreen: React.FC = () => {
     router.back();
   };
 
-  async function fetchLiveAttendanceDetails() {
-    const res = await fetchFromAPI('teachers/attendance/' + class_id);
-
-    if (res && res.success) {
-      const data: Attendance = res.data;
-      setAttendanceDetails(data);
-    }
-  }
-
   const loadRegisteredUser = async () => {
     try {
       const allKeys = await AsyncStorage.getAllKeys();
@@ -137,9 +129,8 @@ const StudentHomeScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchLiveAttendanceDetails();
     loadRegisteredUser();
-  }, [class_id, live_id]);
+  }, []);
 
   // --- ANIMATION LOGIC ---
   const startPumpingAnimation = useCallback(() => {

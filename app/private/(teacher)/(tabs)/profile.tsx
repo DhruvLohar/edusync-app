@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, SafeAreaView, StatusBar, ScrollView, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import React from 'react';
+import { View, Text, SafeAreaView, StatusBar, ScrollView, TouchableOpacity, StyleSheet, Image, RefreshControl } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { fetchFromAPI } from '~/lib/api';
 import { useAuthStore } from '~/lib/store/auth.store';
 import { renderAPIImage } from '~/lib/ImageChecker';
+import { useProfile } from '~/lib/hook/api/useStudent';
 
 // --- REUSABLE PROFILE ROW COMPONENT ---
 interface ProfileRowProps {
@@ -44,29 +44,15 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ iconName, title, value, isActio
 // --- MAIN SCREEN COMPONENT ---
 const ProfileScreen: React.FC = () => {
     const router = useRouter();
-    const [profile, setProfile] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
     const Authstore = useAuthStore();
+    const { data: profile, isLoading: loading, isRefetching: refreshing, refetch } = useProfile();
+
     const handleAction = async (action: string) => {
         if (action === 'Log Out') {
             await Authstore.logOut();
             router.replace('/(auth)');
         }
     };
-
-    useEffect(() => {
-        const fetchProfile = async () => {
-            setLoading(true);
-            const res = await fetchFromAPI<any>('/users/profile');
-            if (res && res.success && res.data) {
-                setProfile(res.data);
-            } else {
-                setProfile(null);
-            }
-            setLoading(false);
-        };
-        fetchProfile();
-    }, []);
 
     if (loading) {
         return (
@@ -89,7 +75,14 @@ const ProfileScreen: React.FC = () => {
     return (
         <SafeAreaView className="flex-1 bg-white">
             <StatusBar barStyle="dark-content" />
-            <ScrollView className="flex-1 mb-20 mt-5" showsVerticalScrollIndicator={false} style={styles.container}>
+            <ScrollView 
+                className="flex-1 mb-20 mt-5" 
+                showsVerticalScrollIndicator={false} 
+                style={styles.container}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={refetch} />
+                }
+            >
                 {/* --- HEADER AND PROFILE INFO --- */}
                 <View className="items-center pt-10 pb-6">
                     {/* Profile Picture */}

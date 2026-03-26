@@ -1,37 +1,17 @@
-import React, { memo, useState, useEffect, useCallback } from 'react';
+import React, { memo, useCallback } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { LiveAttendanceResponse } from '~/type/Teacher';
-import { fetchFromAPI } from '~/lib/api';
 import { useAuthStore } from '~/lib/store/auth.store';
+import { useStudentLiveAttendance } from '~/lib/hook/api/useStudent';
 
-interface LectureCardsProps {
-  refreshToken?: number;
-}
-
-function LectureCards({ refreshToken = 0 }: LectureCardsProps) {
+function LectureCards() {
   const router = useRouter();
   const profile = useAuthStore((state) => state.profile);
-  const [lecture, setLecture] = useState<LiveAttendanceResponse | null>(null);
-
-  const fetchLectures = useCallback(async () => {
-    const res = await fetchFromAPI('students/live-attendance');
-    if (res && res.success && res.data) {
-      setLecture(res.data);
-    } else {
-      setLecture(null);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchLectures();
-    const interval = setInterval(fetchLectures, 15000);
-    return () => clearInterval(interval);
-  }, [fetchLectures, refreshToken]);
+  const { data: lecture } = useStudentLiveAttendance();
 
   const handleCardPress = useCallback(() => {
     if (!lecture?.id) return;
