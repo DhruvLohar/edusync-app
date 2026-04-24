@@ -121,6 +121,11 @@ export function useStudentAttendance({
         }
     }, [onCheckOutSuccess]);
 
+    const resetAttendanceSession = useCallback(() => {
+        handleCheckOut();
+        setIsProcessing(false);
+    }, [handleCheckOut]);
+
     // Get current check-in status
     const getCheckInStatus = useCallback(() => {
         return ExpoBleCore.getCheckInStatus();
@@ -176,6 +181,7 @@ export function useStudentAttendance({
         // Functions
         handleCheckIn,
         handleCheckOut,
+        resetAttendanceSession,
         requestPermissions,
         requestEnableBluetooth,
         isBluetoothEnabled,

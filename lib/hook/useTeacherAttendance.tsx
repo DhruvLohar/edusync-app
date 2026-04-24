@@ -255,6 +255,22 @@ export function useTeacherAttendance({
         setStudents([]);
     }, []);
 
+    const resetAttendanceSession = useCallback(() => {
+        verificationCancelledRef.current = true;
+        if (verificationTimeoutRef.current) {
+            clearTimeout(verificationTimeoutRef.current);
+            verificationTimeoutRef.current = null;
+        }
+        ExpoBleCore.stopStudentScan();
+        ExpoBleCore.clearDiscoveredStudents();
+        setScanning(false);
+        setStudents([]);
+        setAlertProgress({ current: 0, total: 0 });
+        setIsAlerting(false);
+        setVerifyingAddress(null);
+        setIsVerifying(false);
+    }, []);
+
     return {
         // State
         scanning,
@@ -276,5 +292,6 @@ export function useTeacherAttendance({
         getAttendanceReport,
         isBluetoothEnabled,
         clearStudents,
+        resetAttendanceSession,
     };
 }

@@ -14,6 +14,7 @@ import {
   BackHandler,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -34,6 +35,7 @@ import { useStudentAttendance } from '~/lib/hook/useStudentAttendance';
 import { useAttendanceDetails } from '~/lib/hook/api/useStudentAttendance';
 import { useAudio } from '~/lib/hook/useAudio';
 import ExitConfirmSheet from '~/components/ExitConfirmSheet';
+import { queryClient, queryKeys } from '~/lib/queryClient';
 
 const SIMILARITY_THRESHOLD = 0.6;
 
@@ -89,6 +91,7 @@ const StudentHomeScreen: React.FC = () => {
     isProcessing: isBleProcessing,
     handleCheckIn,
     handleCheckOut,
+    resetAttendanceSession,
   } = useStudentAttendance({
     onAlertReceived,
     onCheckInSuccess,
@@ -108,10 +111,41 @@ const StudentHomeScreen: React.FC = () => {
 
   const confirmExit = () => {
     setShowExitSheet(false);
-    if (checkedIn) handleCheckOut();
+    resetAttendanceSession();
+    setScanPhase('idle');
+    setCapturedImageUri(null);
+    setIsProcessingFace(false);
+    if (class_id) {
+      queryClient.removeQueries({ queryKey: queryKeys.attendance.details(class_id) });
+    }
     allowExitRef.current = true;
     router.back();
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        resetAttendanceSession();
+        setShowExitSheet(false);
+        setScanPhase('idle');
+        setCapturedImageUri(null);
+        setIsProcessingFace(false);
+        allowExitRef.current = false;
+        if (class_id) {
+          queryClient.removeQueries({ queryKey: queryKeys.attendance.details(class_id) });
+        }
+      };
+    }, [class_id, resetAttendanceSession])
+  );
+
+  useEffect(() => {
+    return () => {
+      resetAttendanceSession();
+      if (class_id) {
+        queryClient.removeQueries({ queryKey: queryKeys.attendance.details(class_id) });
+      }
+    };
+  }, [class_id, resetAttendanceSession]);
 
   const loadRegisteredUser = async () => {
     try {
@@ -355,7 +389,13 @@ const StudentHomeScreen: React.FC = () => {
             <View className="items-center">
               <TouchableOpacity
                 onPress={() => {
-                  handleCheckOut();
+                  resetAttendanceSession();
+                  setScanPhase('idle');
+                  setCapturedImageUri(null);
+                  setIsProcessingFace(false);
+                  if (class_id) {
+                    queryClient.removeQueries({ queryKey: queryKeys.attendance.details(class_id) });
+                  }
                   router.back();
                 }}
                 className="bg-gray-100 px-8 py-3 rounded-full"

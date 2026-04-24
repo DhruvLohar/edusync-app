@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StatusBar, ScrollView, TouchableOpacity, Dimensions, StyleSheet, Image, Modal } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StatusBar, ScrollView, TouchableOpacity, Dimensions, StyleSheet, Image, Modal, RefreshControl } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { renderAPIImage } from '~/lib/ImageChecker';
@@ -100,9 +100,14 @@ const AttendanceCard: React.FC<ClassAttendance> = ({ name, department, time, dat
 const HomeScreen: React.FC = () => {
 
     const profile = useAuthStore((state) => state.profile);
-    const { data: classes } = useTeacherHistory();
-    const { data: lectures } = useTeacherClasses();
+    const { data: classes, refetch: refetchHistory, isRefetching: isHistoryRefetching } = useTeacherHistory();
+    const { data: lectures, refetch: refetchClasses, isRefetching: isClassesRefetching } = useTeacherClasses();
     const [showClassModal, setShowClassModal] = useState(false);
+    const isRefreshing = isHistoryRefetching || isClassesRefetching;
+
+    const onRefresh = useCallback(async () => {
+        await Promise.all([refetchHistory(), refetchClasses()]);
+    }, [refetchHistory, refetchClasses]);
 
     const getGreeting = () => {
         const hour = new Date().getHours();
@@ -115,7 +120,11 @@ const HomeScreen: React.FC = () => {
     return (
         <SafeAreaView className="flex-1 bg-white">
             <StatusBar barStyle="dark-content" />
-            <ScrollView className="flex-1 px-5" showsVerticalScrollIndicator={false}>
+            <ScrollView
+                className="flex-1 px-5"
+                showsVerticalScrollIndicator={false}
+                refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
+            >
                 {/* Header (Greeting & Settings Icon) */}
                 <View className="flex-row justify-between items-center py-4 mt-8">
                     {/* User Profile Photo */}
@@ -190,7 +199,10 @@ const HomeScreen: React.FC = () => {
                     </View>
 
                     {/* Classes List */}
-                    <ScrollView className="flex-1">
+                    <ScrollView
+                        className="flex-1"
+                        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
+                    >
                         <View className="py-4">
                             <AllClasses classes={lectures} />
                         </View>

@@ -31,7 +31,9 @@ export function useAttendanceDetails(classId: string) {
             return res.data?.success ? (res.data.data as Attendance) : null;
         },
         enabled: !!classId,
-        staleTime: 30_000,
+        staleTime: 0,
+        gcTime: 0,
+        refetchOnMount: 'always',
     });
 
     return { data: data ?? null, isLoading };

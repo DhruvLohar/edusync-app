@@ -8,6 +8,7 @@ import {
   ScrollView,
   Image,
   Modal,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -18,13 +19,14 @@ import LectureCards from '~/components/custom/studentHome/LectureCards';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '~/lib/store/auth.store';
 import { useStudentHistory } from '~/lib/hook/api/useStudentAttendance';
+import { queryClient, queryKeys } from '~/lib/queryClient';
 
 
 // --- MAIN SCREEN COMPONENT ---
 const StudentHomeScreen: React.FC = () => {
 
   const profile = useAuthStore((state) => state.profile);
-  const { data: history, refetch: refetchHistory } = useStudentHistory();
+  const { data: history, refetch: refetchHistory, isRefetching: isHistoryRefetching } = useStudentHistory();
   const [isAttendanceModalVisible, setIsAttendanceModalVisible] = useState(false);
 
   const openAttendanceModal = useCallback(() => {
@@ -36,6 +38,13 @@ const StudentHomeScreen: React.FC = () => {
     refetchHistory();
   }, [refetchHistory]);
 
+  const refreshAttendanceModal = useCallback(async () => {
+    await Promise.all([
+      refetchHistory(),
+      queryClient.invalidateQueries({ queryKey: queryKeys.student.liveAttendance }),
+    ]);
+  }, [refetchHistory]);
+
   return (
     <SafeAreaView className="flex-1">
       <StatusBar barStyle="dark-content" />
@@ -44,6 +53,9 @@ const StudentHomeScreen: React.FC = () => {
         className="flex-1 mt-5 bg-[#D3EDFF]"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={isHistoryRefetching} onRefresh={refreshAttendanceModal} />
+        }
       >
         {/* Header (Greeting & Settings Icon) */}
         <View className="w-full px-5 flex-row justify-between items-center py-4 mt-8">
@@ -116,7 +128,12 @@ const StudentHomeScreen: React.FC = () => {
           </View>
 
           {/* Lectures List */}
-          <ScrollView className="flex-1">
+          <ScrollView
+            className="flex-1"
+            refreshControl={
+              <RefreshControl refreshing={isHistoryRefetching} onRefresh={refreshAttendanceModal} />
+            }
+          >
             <View className="py-4">
               <LectureCards />
             </View>

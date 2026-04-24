@@ -10,12 +10,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAttendanceDetails, useSubmitAttendance, useEndAttendance } from '~/lib/hook/api/useTeacherAttendance';
 import { useTeacherAttendance } from '~/lib/hook/useTeacherAttendance';
 import type { Student as BLEStudent } from '~/lib/hook/useTeacherAttendance';
 import { renderAPIImage } from '~/lib/ImageChecker';
 import ExitConfirmSheet from '~/components/ExitConfirmSheet';
+import { queryClient, queryKeys } from '~/lib/queryClient';
 
 interface EnrichedStudent {
     roll_no: string;
@@ -52,6 +54,7 @@ const TeacherAttendanceScreen: React.FC = () => {
         isVerifying,
         verifyStudentsSequentially,
         cancelVerification,
+        resetAttendanceSession,
     } = useTeacherAttendance({
         classPrefix: live_id || '',
         onStudentFound: useCallback((bleStudent: BLEStudent) => {
@@ -100,15 +103,33 @@ const TeacherAttendanceScreen: React.FC = () => {
 
     const confirmExit = useCallback(async () => {
         setShowExitSheet(false);
-        if (scanning) stopScanning();
+        resetAttendanceSession();
+        setStudents([]);
+        setAttendance({});
 
         if (class_id) {
             await endAttendance({ attendance_id: Number(class_id), ended_abnormally: true });
+            queryClient.removeQueries({ queryKey: queryKeys.attendance.details(class_id) });
         }
 
         allowExitRef.current = true;
         router.back();
-    }, [scanning, stopScanning, class_id, endAttendance, router]);
+    }, [class_id, endAttendance, resetAttendanceSession, router]);
+
+    useFocusEffect(
+        useCallback(() => {
+            return () => {
+                resetAttendanceSession();
+                setShowExitSheet(false);
+                setStudents([]);
+                setAttendance({});
+                allowExitRef.current = false;
+                if (class_id) {
+                    queryClient.removeQueries({ queryKey: queryKeys.attendance.details(class_id) });
+                }
+            };
+        }, [class_id, resetAttendanceSession])
+    );
 
     // Populate students list when attendance details arrive from query
     useEffect(() => {
